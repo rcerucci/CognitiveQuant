@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/cognitive_quant.egg-info/PKG-INFO
+src/cognitive_quant.egg-info/SOURCES.txt
+src/cognitive_quant.egg-info/dependency_links.txt
+src/cognitive_quant.egg-info/requires.txt
+src/cognitive_quant.egg-info/top_level.txt
+src/motor/__init__.py
+src/motor/ohlc/__init__.py
+src/motor/ohlc/sync.py
+src/motor/ohlc/transform.py
+src/motor/ohlc/validation.py

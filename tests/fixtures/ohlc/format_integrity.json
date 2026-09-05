@@ -1,0 +1,16 @@
+{
+  "valid_bars": [
+    {"name": "single_valid_bar", "data": [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00], "description": "Valid"},
+    {"name": "multiple_valid_bars_ordered", "data": [[1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00], [1704069000000, 100.75, 101.25, 100.60, 101.00, 100.75, 101.25], [1704070800000, 101.00, 101.50, 100.80, 101.25, 101.00, 101.50]], "description": "Multiple valid bars"}
+  ],
+  "invalid_bars": {
+    "format": [
+      {"name": "missing_fields", "data": [1704067200000, 100.50, 101.00, 100.25, 100.75], "expected_error": "format_invalido"},
+      {"name": "too_many_fields", "data": [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00, 102.00], "expected_error": "format_invalido"}
+    ],
+    "price_integrity": [
+      {"name": "high_less_than_open_close", "data": [1704067200000, 100.50, 99.00, 100.25, 100.75, 100.50, 101.00], "expected_error": "integridade_preco_invalida"},
+      {"name": "low_greater_than_open_close", "data": [1704067200000, 100.50, 101.00, 101.50, 100.75, 100.50, 101.00], "expected_error": "integridade_preco_invalida"}
+    ]
+  }
+}
