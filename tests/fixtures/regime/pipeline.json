@@ -1,0 +1,41 @@
+{
+  "test_cases": [
+    {
+      "name": "f2_pass_short_series",
+      "description": "Série curta que passa em F2, usada para warmup",
+      "f2_status": "PASS",
+      "bars": [
+        [1704067200000, 100.0, 100.5, 99.5, 100.2, 100.0, 100.4],
+        [1704069000000, 100.2, 100.6, 100.1, 100.5, 100.2, 100.6],
+        [1704070800000, 100.5, 100.9, 100.4, 100.8, 100.5, 100.9],
+        [1704072600000, 100.8, 101.2, 100.7, 101.0, 100.8, 101.1],
+        [1704074400000, 101.0, 101.4, 100.9, 101.3, 101.0, 101.3]
+      ],
+      "expected": {
+        "status": "NEUTRO",
+        "reason": "warm_up"
+      }
+    },
+    {
+      "name": "f2_neutro",
+      "description": "F2 resultou em NEUTRO",
+      "f2_status": "NEUTRO",
+      "bars": [],
+      "expected": {
+        "status": "NEUTRO",
+        "reason": "f2_neutro"
+      }
+    },
+    {
+      "name": "f3_pass_complete",
+      "description": "Cenário completo: F2 PASS + Hurst REVERSAL + OU válido",
+      "f2_status": "PASS",
+      "expected": {
+        "status": "PASS",
+        "hurst_type": "REVERSAL",
+        "theta_positive": true,
+        "tau_positive": true
+      }
+    }
+  ]
+}

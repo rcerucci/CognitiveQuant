@@ -1,0 +1,65 @@
+{
+  "test_cases": [
+    {
+      "name": "reversal_regime",
+      "description": "Série que gera regime REVERSAL (H < 0.45)",
+      "series_type": "ou_reversal",
+      "window_size": 200,
+      "expected": {
+        "status": "PASS",
+        "regime": "REVERSAL"
+      }
+    },
+    {
+      "name": "rw_regime",
+      "description": "Série Random Walk (H ≈ 0.5)",
+      "series_type": "random_walk",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "regime": null
+      }
+    },
+    {
+      "name": "trend_regime",
+      "description": "Série com tendência (H > 0.55)",
+      "series_type": "trend",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "regime": null
+      }
+    },
+    {
+      "name": "warmup_short_series",
+      "description": "Série curta (< 200) para warmup",
+      "series_type": "short",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "regime": null,
+        "hurst": null
+      }
+    },
+    {
+      "name": "margem_superior_H",
+      "description": "H na borda superior (H = 0.55)",
+      "series_type": "margem_superior",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "regime": null
+      }
+    },
+    {
+      "name": "margem_inferior_H",
+      "description": "H na borda inferior (H = 0.45)",
+      "series_type": "margem_inferior",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "regime": null
+      }
+    }
+  ]
+}

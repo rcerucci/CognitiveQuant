@@ -1,0 +1,44 @@
+{
+  "test_cases": [
+    {
+      "name": "ou_valid_kalman",
+      "description": "Série OU válida com θ > 0 estimável via Kalman",
+      "series_type": "ou_valid",
+      "window_size": 200,
+      "expected": {
+        "status": "PASS",
+        "theta_positive": true,
+        "tau_finite": true
+      }
+    },
+    {
+      "name": "ou_theta_negative",
+      "description": "Série com θ estimado ≤ 0",
+      "series_type": "ou_negative",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "theta": 0.0
+      }
+    },
+    {
+      "name": "ou_degenerate",
+      "description": "Série degenerada (alta variação excessiva)",
+      "series_type": "ou_degenerate",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO"
+      }
+    },
+    {
+      "name": "short_series_mle",
+      "description": "Série curta para MLE fallback",
+      "series_type": "short_mle",
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "reason": "Insufficient historical data"
+      }
+    }
+  ]
+}
