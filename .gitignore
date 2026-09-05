@@ -9,3 +9,11 @@ dist/
 build/
 .DS_Store
 IDEA.md
+
+# Hermes local setup
+.hermes/
+
+# Workspace temporarios e relatorios
+IDEA.md
+TASKS.md
+test-results.xml
