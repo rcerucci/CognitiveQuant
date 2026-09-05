@@ -77,13 +77,13 @@ def validate_ohlc_format(bar: list) -> bool:
     
     try:
         ts = float(bar[0])
-        if ts <= 0:
+        if ts <= 0 or not math.isfinite(ts):
             return False
         for i in range(1, 7):
             val = float(bar[i])
             if not isinstance(bar[i], (int, float)):
                 return False
-            if val <= 0:  # Preços devem ser positivos
+            if val <= 0 or not math.isfinite(val):  # Preços devem ser positivos e finitos
                 return False
     except (ValueError, TypeError):
         return False

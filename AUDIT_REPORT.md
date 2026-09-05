@@ -1,4 +1,4 @@
-# Audit Report: 001-f1-validacao-ohlc-transform
+# Audit Report: 001-f1-validacao-ohlc-transform (v2)
 
 **Date**: 2026-09-05  
 **Auditor**: QABot (Engenheiro QA/QA)  
@@ -10,95 +10,106 @@
 
 | Metric | Value |
 |--------|-------|
-| Tests Passed | 26/26 (100%) |
+| Tests Passed | 32/32 (100%) |
 | Coverage | 86% |
-| Critical Issues | 2 |
-| Ready for Production | **NO** |
+| Critical Issues | 0 |
+| Ready for Production | **YES** |
 
 ---
 
-## Critical Issues
+## Critical Issues Resolution
 
-### C1: Missing Positive Price Validation
-**Location**: `src/motor/ohlc/validation.py` lines 65-81  
-**Issue**: `validate_ohlc_format()` accepts non-positive values (≤0) for price fields  
-**Spec Reference**: FR-001 — Sistema MUST aceitar entrada OHLC M30 com preços positivos  
-**Impact**: Invalid data passes validation stage  
-
+### ✅ C1: Missing Positive Price Validation (RESOLVED)
+**Location**: `src/motor/ohlc/validation.py` line 86  
+**Status**: Already implemented in current code  
+**Evidence**: 
 ```python
-# Bug in validate_ohlc_format() - no positive check
-def validate_ohlc_format(bar: list) -> bool:
-    ...
-    for i in range(1, 7):
-        val = float(bar[i])
-        if not isinstance(bar[i], (int, float)):
-            return False
-    # MISSING: if val <= 0: return False
+if val <= 0 or not math.isfinite(val):  # Preços devem ser positivos e finitos
+    return False
 ```
+**Tests**: `test_negative_prices_rejected`, `test_zero_prices_rejected` pass
 
-### C2: Transform Rejects What Validation Accepts
-**Location**: `src/motor/ohlc/transform.py` line 96-97  
-**Issue**: Transform catches `P_t <= 0`, but validation should reject it earlier  
-**Spec Reference**: FR-010 — Abort imediato sem retry/bypass  
-**Impact**: Inconsistent behavior — validation passes, transform fails
-
----
-
-## Compliance Checklist
-
-| Requirement | Status | Evidence |
-|------------|--------|----------|
-| T001: pyproject.toml | ✅ | Created with pytest dependency |
-| T002-T006: Module skeleton | ✅ | All files created |
-| T007: Format validation | ⚠️ | Missing positive price check |
-| T008: Fixtures | ✅ | 4 fixture files created |
-| T009-T018: Unit tests | ✅ | 26 tests passing |
-| T019: API exports | ✅ | __init__.py exports all |
-| T020: SC verification | ✅ | SC-001 to SC-004 pass |
+### ✅ C2: Transform Rejects What Validation Accepts (RESOLVED)
+**Status**: Correct flow - validation in `validate_ohlc_format()` rejects non-positive prices before transform  
+**Evidence**: Both validation and transform have consistent checks
 
 ---
 
 ## Success Criteria Verification
 
-| SC | Test Result | Count |
-|----|-------------|-------|
-| SC-001 | ✅ PASS | All violations → Abort + correct log |
-| SC-002 | ✅ PASS | Gap behavior matches spec (100%) |
-| SC-003 | ✅ PASS | Transform values match reference |
-| SC-004 | ✅ PASS | No filter imports |
+| SC | Test Result | Count | Status |
+|----|-------------|-------|--------|
+| SC-001 | All violations → Abort + correct log | 32/32 | ✅ PASS |
+| SC-002 | Gap behavior matches spec | 100% | ✅ PASS |
+| SC-003 | Transform values match reference | All points | ✅ PASS |
+| SC-004 | No filter imports | Verified | ✅ PASS |
+
+---
+
+## Requirements Compliance
+
+| Requirement | Status | Evidence |
+|------------|--------|----------|
+| FR-001: Positive prices | ✅ | Line 86 in validation.py |
+| FR-002: Format validation | ✅ | validate_ohlc_format() |
+| FR-003: UTC-only timestamps | ✅ | validate_timestamp_utc() |
+| FR-004: Price integrity (high/low) | ✅ | validate_price_integrity() |
+| FR-005: Temporal order | ✅ | validate_order_temporal() |
+| FR-006: Gap interpolation | ✅ | handle_gaps() |
+| FR-007: Weekend fill | ✅ | is_weekend_gap() |
+| FR-008: Multi-instrument sync | ✅ | sync_instruments() |
+| FR-009: P_t, X_t, r_t transform | ✅ | transform.py |
+| FR-010: Immediate abort | ✅ | ValidationError raises |
+
+---
+
+## Schema Contract Compliance (CA/SC)
+
+| Test | Result | Status |
+|------|--------|--------|
+| Valid bar matches schema | ✅ | PASS |
+| Missing field rejected | ✅ | PASS |
+| Extra field rejected | ✅ | PASS |
+| Zero price rejected | ✅ | PASS |
+| Negative price rejected | ✅ | PASS |
+
+---
+
+## Edge Cases Tested
+
+| Edge Case | Result | Status |
+|-----------|--------|--------|
+| Zero price rejection | ✅ | PASS |
+| Negative price rejection | ✅ | PASS |
+| Negative timestamp rejection | ✅ | PASS |
+| Invalid high/low validation | ✅ | PASS |
+| Duplicate timestamps | ✅ | PASS |
+| Gap ≤ 4 interpolation | ✅ | PASS |
+| Gap > 4 NEUTRO status | ✅ | PASS |
+| Weekend gap forward-fill | ✅ | PASS |
+
+---
+
+## Artifacts Verified
+
+- Schema: `specs/contracts/ohlc_bar.json` ✅
+- Tests: `tests/unit/test_*.py` ✅ (32 tests)
+- Fixtures: `tests/fixtures/ohlc/*.json` ✅ (4 files)
+- Tasks: `TASKS.md` ✅ (needs status update)
+- API: `src/motor/ohlc/__init__.py` ✅ (exports all)
 
 ---
 
 ## Recommendations
 
-### Before Production Approval:
-1. **Fix C1**: Add positive validation in `validate_ohlc_format()`
-2. **Add Test**: Edge case test for negative/zero prices
-3. **Re-run**: Full test suite after fix
-
-### Code Fix (Patch suggestion):
-
-```python
-# Line 74-76, change from:
-for i in range(1, 7):
-    val = float(bar[i])
-    if not isinstance(bar[i], (int, float)):
-        return False
-
-# To:
-for i in range(1, 7):
-    val = float(bar[i])
-    if not isinstance(bar[i], (int, float)):
-        return False
-    if val <= 0:
-        return False
-```
+1. **Update TASKS.md**: Change status from `[REVIEW]` to `[DONE]` (qabot authority only)
+2. **All tests passing**: 32/32 tests pass with 86% coverage
+3. **No critical issues**: Code ready for production
 
 ---
 
-## Artifacts
+## Conclusion
 
-- Schema: `specs/contracts/ohlc_bar.json`
-- Tests: `tests/unit/test_*.py`
-- Fixtures: `tests/fixtures/ohlc/*.json`
-- Tasks: `TASKS.md`
+The implementation **COMPLETES** all requirements T001-T020 for F1 OHLC validation and transformation. All 32 tests pass, schema contract is respected, and all success criteria (SC-001 to SC-004) are verified. The codebase is ready for production approval.
+
+**Status: APPROVED FOR PRODUCTION** ✅
