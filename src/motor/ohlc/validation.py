@@ -63,7 +63,13 @@ class ValidatedSeries:
 
 
 def validate_ohlc_format(bar: list) -> bool:
-    """Valida se a barra tem o formato correto [timestamp, open, high, low, close, bid, ask]."""
+    """Valida se a barra tem o formato correto [timestamp, open, high, low, close, bid, ask].
+    
+    Regras:
+    - Exatamente 7 campos
+    - Timestamp deve ser numérico positivo (Unix timestamp)
+    - Todos os preços (open, high, low, close, bid, ask) devem ser números positivos
+    """
     if not isinstance(bar, (list, tuple)):
         return False
     if len(bar) != 7:
@@ -71,9 +77,13 @@ def validate_ohlc_format(bar: list) -> bool:
     
     try:
         ts = float(bar[0])
+        if ts <= 0:
+            return False
         for i in range(1, 7):
             val = float(bar[i])
             if not isinstance(bar[i], (int, float)):
+                return False
+            if val <= 0:  # Preços devem ser positivos
                 return False
     except (ValueError, TypeError):
         return False

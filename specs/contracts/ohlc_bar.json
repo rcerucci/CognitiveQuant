@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "specs/contracts/ohlc_bar.json",
+  "title": "OHLC Bar M30",
+  "description": "Schema para uma barra OHLC M30 conforme especificação F1 §3.1",
+  "type": "array",
+  "minItems": 7,
+  "maxItems": 7,
+  "items": [
+    {
+      "name": "timestamp_UTC",
+      "type": "number",
+      "description": "Timestamp em milissegundos UTC"
+    },
+    {
+      "name": "open",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": 0,
+      "description": "Preço de abertura"
+    },
+    {
+      "name": "high",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": 0,
+      "description": "Preço máximo"
+    },
+    {
+      "name": "low",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": 0,
+      "description": "Preço mínimo"
+    },
+    {
+      "name": "close",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": 0,
+      "description": "Preço de fechamento"
+    },
+    {
+      "name": "bid",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": 0,
+      "description": "Preço bid"
+    },
+    {
+      "name": "ask",
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMinimum": 0,
+      "description": "Preço ask"
+    }
+  ],
+  "additionalItems": false
+}

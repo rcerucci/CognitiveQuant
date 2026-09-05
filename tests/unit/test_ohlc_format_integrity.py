@@ -47,3 +47,42 @@ class TestValidateOhlcFormat:
     def test_invalid_format_missing_fields(self):
         bar = [1704067200000, 100.50, 101.00]
         assert validate_ohlc_format(bar) is False
+    
+    def test_negative_prices_rejected(self):
+        """FR-001: Preços negativos devem ser rejeitados."""
+        bar = [1704067200000, 100.50, 101.00, 100.25, 100.75, -100.50, 101.00]
+        assert validate_ohlc_format(bar) is False
+    
+    def test_zero_prices_rejected(self):
+        """FR-001: Preços zero devem ser rejeitados."""
+        bar = [1704067200000, 100.50, 101.00, 100.25, 100.75, 0.0, 101.00]
+        assert validate_ohlc_format(bar) is False
+    
+    def test_negative_timestamp_rejected(self):
+        """Timestamp negativo deve ser rejeitado."""
+        bar = [-1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00]
+        assert validate_ohlc_format(bar) is False
+
+class TestUS1ValidationPositive:
+    """Testes para validação de preços positivos (FR-001)."""
+    
+    def test_valid_all_positive_prices(self):
+        """Todos os preços positivos devem passar."""
+        bar = [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00]
+        # Should not raise any error
+        result = validate_bar(bar)
+        assert result["valid"] is True
+    
+    def test_negative_bid_rejected(self):
+        """Bid negativo deve causar abort com format_invalido."""
+        bar = [1704067200000, 100.50, 101.00, 100.25, 100.75, -100.0, 101.00]
+        with pytest.raises(ValidationError) as exc_info:
+            validate_bar(bar)
+        assert exc_info.value.code == "format_invalido"
+    
+    def test_negative_ask_rejected(self):
+        """Ask negativo deve causar abort com format_invalido."""
+        bar = [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.0, -101.0]
+        with pytest.raises(ValidationError) as exc_info:
+            validate_bar(bar)
+        assert exc_info.value.code == "format_invalido"
