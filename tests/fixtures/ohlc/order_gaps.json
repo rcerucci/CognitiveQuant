@@ -1,0 +1,81 @@
+{
+  "duplicates": {
+    "data": [
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704067200000, 100.75, 101.25, 100.60, 101.00, 100.75, 101.25]
+    ],
+    "expected_status": "abort",
+    "description": "Duplicate timestamps should cause abort"
+  },
+  "not_ordered": {
+    "data": [
+      [1704069000000, 100.75, 101.25, 100.60, 101.00, 100.75, 101.25],
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00]
+    ],
+    "expected_status": "abort",
+    "description": "Reverse chronological order should cause abort"
+  },
+  "gap_1_bar": {
+    "data": [
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704070800000, 101.00, 101.50, 100.80, 101.25, 101.00, 101.50]
+    ],
+    "gap_size": 1,
+    "expected_status": "interpolate",
+    "description": "Gap of 1 bar should be interpolated"
+  },
+  "gap_2_bars": {
+    "data": [
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704072600000, 101.50, 102.00, 101.25, 101.75, 101.50, 102.00]
+    ],
+    "gap_size": 2,
+    "expected_status": "interpolate",
+    "description": "Gap of 2 bars should be interpolated"
+  },
+  "gap_3_bars": {
+    "data": [
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704074400000, 102.00, 102.50, 101.75, 102.25, 102.00, 102.50]
+    ],
+    "gap_size": 3,
+    "expected_status": "interpolate",
+    "description": "Gap of 3 bars should be interpolated"
+  },
+  "gap_4_bars": {
+    "data": [
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704076200000, 102.50, 103.00, 102.25, 102.75, 102.50, 103.00]
+    ],
+    "gap_size": 4,
+    "expected_status": "interpolate",
+    "description": "Gap of 4 bars should be interpolated (at threshold)"
+  },
+  "gap_5_bars": {
+    "data": [
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704078000000, 103.00, 103.50, 102.75, 103.25, 103.00, 103.50]
+    ],
+    "gap_size": 5,
+    "expected_status": "gap_dados",
+    "description": "Gap of 5 bars should be marked as gap_dados and NEUTRO"
+  },
+  "gap_8_bars": {
+    "data": [
+      [1704067200000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704083400000, 104.00, 104.50, 103.75, 104.25, 104.00, 104.50]
+    ],
+    "gap_size": 8,
+    "expected_status": "gap_dados",
+    "description": "Gap larger than 5 bars should be marked as gap_dados and NEUTRO"
+  },
+  "weekend_gap": {
+    "data": [
+      [1704495600000, 100.50, 101.00, 100.25, 100.75, 100.50, 101.00],
+      [1704672000000, 102.50, 103.00, 102.25, 102.75, 102.50, 103.00]
+    ],
+    "m30_interval_ms": 1800000,
+    "expected_action": "weekend_fill",
+    "description": "Weekend gap (Fri 23:00 to Mon 00:00) should have weekend_fill flag"
+  }
+}
