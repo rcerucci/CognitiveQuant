@@ -1,0 +1,346 @@
+{
+  "valid_bars": [
+    {
+      "name": "single_valid_bar",
+      "data": [
+        1704067200000,
+        100.5,
+        101.0,
+        100.25,
+        100.75,
+        100.5,
+        101.0
+      ],
+      "description": "A valid OHLC bar with UTC timestamp"
+    },
+    {
+      "name": "multiple_valid_bars_ordered",
+      "data": [
+        [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        [
+          1704069000000,
+          100.75,
+          101.25,
+          100.6,
+          101.0,
+          100.75,
+          101.25
+        ],
+        [
+          1704070800000,
+          101.0,
+          101.5,
+          100.8,
+          101.25,
+          101.0,
+          101.5
+        ]
+      ],
+      "description": "Multiple valid bars in chronological order"
+    }
+  ],
+  "invalid_bars": {
+    "format": [
+      {
+        "name": "missing_fields",
+        "data": [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75
+        ],
+        "expected_error": "format_invalido",
+        "description": "Missing bid and ask fields"
+      },
+      {
+        "name": "too_many_fields",
+        "data": [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0,
+          102.0
+        ],
+        "expected_error": "format_invalido",
+        "description": "Extra fields not allowed"
+      },
+      {
+        "name": "invalid_field_type",
+        "data": [
+          "timestamp",
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        "expected_error": "format_invalido",
+        "description": "Timestamp is not numeric"
+      },
+      {
+        "name": "string_values",
+        "data": [
+          1704067200000,
+          "100.50",
+          "101.00",
+          "100.25",
+          "100.75",
+          "100.50",
+          "101.00"
+        ],
+        "expected_error": "format_invalido",
+        "description": "OHLC values are strings instead of numbers"
+      }
+    ],
+    "price_integrity": [
+      {
+        "name": "high_less_than_open_close",
+        "data": [
+          1704067200000,
+          100.5,
+          99.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        "expected_error": "integridade_preco_invalida",
+        "description": "High (99.00) is less than open (100.50) and close (100.75)"
+      },
+      {
+        "name": "low_greater_than_open_close",
+        "data": [
+          1704067200000,
+          100.5,
+          101.0,
+          101.5,
+          100.75,
+          100.5,
+          101.0
+        ],
+        "expected_error": "integridade_preco_invalida",
+        "description": "Low (101.50) is greater than open (100.50) and close (100.75)"
+      },
+      {
+        "name": "high_equals_open_close_valid",
+        "data": [
+          1704067200000,
+          100.5,
+          100.5,
+          100.5,
+          100.5,
+          100.5,
+          100.5
+        ],
+        "expected_error": null,
+        "description": "Bar with all prices equal (valid)"
+      }
+    ],
+    "timezone": [
+      {
+        "name": "non_utc_offset_negative",
+        "data": [
+          1704060000000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        "expected_error": "format_invalido",
+        "description": "Timestamp with non-UTC offset (GMT-2)"
+      }
+    ]
+  },
+  "gaps": {
+    "missing_1_bar": {
+      "data": [
+        [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        [
+          1704070800000,
+          101.0,
+          101.5,
+          100.8,
+          101.25,
+          101.0,
+          101.5
+        ]
+      ],
+      "gap_size": 1,
+      "expected_action": "interpolate",
+      "description": "Gap of 1 bar should be interpolated"
+    },
+    "missing_4_bars": {
+      "data": [
+        [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        [
+          1704078000000,
+          101.5,
+          102.0,
+          101.25,
+          101.75,
+          101.5,
+          102.0
+        ]
+      ],
+      "gap_size": 4,
+      "expected_action": "interpolate",
+      "description": "Gap of 4 bars should be interpolated (threshold)"
+    },
+    "missing_5_bars": {
+      "data": [
+        [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        [
+          1704085200000,
+          102.0,
+          102.5,
+          101.75,
+          102.25,
+          102.0,
+          102.5
+        ]
+      ],
+      "gap_size": 5,
+      "expected_action": "gap_dados",
+      "description": "Gap of 5 bars should generate gap_dados status and NEUTRO"
+    },
+    "missing_8_bars": {
+      "data": [
+        [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        [
+          1704110400000,
+          103.0,
+          103.5,
+          102.75,
+          103.25,
+          103.0,
+          103.5
+        ]
+      ],
+      "gap_size": 8,
+      "expected_action": "gap_dados",
+      "description": "Gap larger than 5 bars should generate gap_dados status and NEUTRO"
+    }
+  },
+  "temporal_order": {
+    "duplicates": {
+      "data": [
+        [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ],
+        [
+          1704067200000,
+          100.75,
+          101.25,
+          100.6,
+          101.0,
+          100.75,
+          101.25
+        ]
+      ],
+      "expected_error": "ordem_temporal_invalida",
+      "description": "Duplicate timestamps should abort"
+    },
+    "not_ordered": {
+      "data": [
+        [
+          1704069000000,
+          100.75,
+          101.25,
+          100.6,
+          101.0,
+          100.75,
+          101.25
+        ],
+        [
+          1704067200000,
+          100.5,
+          101.0,
+          100.25,
+          100.75,
+          100.5,
+          101.0
+        ]
+      ],
+      "expected_error": "ordem_temporal_invalida",
+      "description": "Sequence not ordered by timestamp should abort"
+    }
+  },
+  "weekend_gap": {
+    "data": [
+      [
+        1704067200000,
+        100.5,
+        101.0,
+        100.25,
+        100.75,
+        100.5,
+        101.0
+      ],
+      [
+        1704163200000,
+        102.5,
+        103.0,
+        102.25,
+        102.75,
+        102.5,
+        103.0
+      ]
+    ],
+    "m30_interval_ms": 1800000,
+    "expected_action": "weekend_fill",
+    "description": "Weekend gap should forward-fill prices"
+  }
+}
