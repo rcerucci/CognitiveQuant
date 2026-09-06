@@ -9,7 +9,7 @@ Estratégia (003b hotfix):
 2. Calcular Hurst (sem hard-gate - apenas diagnóstico)
 3. Estimar OU (θ, τ)
 4. Bootstrap θ → IC_low, CV
-5. Gate: θ̂>0 ∧ IC_low>0 ∧ τ≤K
+5. Gate: θ̂>0 ∧ IC_low>0 ∧ IC_low<θ̂ ∧ 1≤τ≤20 ∧ ADF(X_t) p<0.05
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 
 from motor.filters.pipeline import PipelineResult, PipelineStatus
+from motor.filters.adf import FilterADF, FilterStatus as ADFStatus
 
 # Constante K = 20 barras M30 (lock Marcos 003b)
 K_HALF_LIFE_BARS = 20
@@ -45,6 +46,7 @@ class F3PipelineResult:
     reason: Optional[str] = None
     metrics: Dict[str, Any] = field(default_factory=dict)
     half_life_bars: int = K_HALF_LIFE_BARS  # K = 20
+    p_value_adf_x: Optional[float] = None  # ADF p-value em X_t
 
 
 class F3Pipeline:
@@ -53,6 +55,7 @@ class F3Pipeline:
     HURST_REVERSAL_THRESHOLD = 0.45
     HURST_TREND_THRESHOLD = 0.55
     CV_STABILITY_THRESHOLD = 0.30
+    ADF_P_THRESHOLD = 0.05
     
     def __init__(
         self,
@@ -72,17 +75,39 @@ class F3Pipeline:
         """Verifica se F2 resultou em PASS."""
         return self.f2_result.status == PipelineStatus.PASS
     
-    def _check_reversal_gate(self, theta: Optional[float], ic_low: Optional[float], tau: Optional[float]) -> tuple[bool, str]:
-        """Verifica gate de reversão conforme 003b: θ̂>0 ∧ IC_low>0 ∧ τ≤K.
+    def _run_adf_on_x(self) -> tuple[bool, float]:
+        """Executa ADF em X_t (log-preços) para verificar estacionariedade.
+        
+        Returns:
+            Tupla (passou, p_value)
+        """
+        adf_result = FilterADF(self.log_prices).run()
+        p_value = adf_result.p_value if adf_result.p_value is not None else 1.0
+        return adf_result.status == ADFStatus.PASS, p_value
+    
+    def _check_reversal_gate(
+        self, 
+        theta: Optional[float], 
+        ic_low: Optional[float], 
+        tau: Optional[float],
+        adf_pass: bool
+    ) -> tuple[bool, str]:
+        """Verifica gate de reversão conforme 003b: 
+        θ̂>0 ∧ IC_low>0 ∧ IC_low<θ̂ ∧ 1≤τ≤20 ∧ ADF(X_t) p<0.05.
         
         Args:
             theta: Estimativa de θ
             ic_low: IC inferior bootstrap (percentil 2.5%)
             tau: Meia-vida = ln(2)/θ
+            adf_pass: ADF(X_t) p < 0.05
             
         Returns:
             Tupla (elegível, razão)
         """
+        # Verificar ADF(X_t) p < 0.05
+        if not adf_pass:
+            return False, "ADF(X_t) p >= 0.05 (não estacionário)"
+        
         # Verificar θ > 0
         if theta is None or theta <= 0:
             return False, "θ ≤ 0 or not finite"
@@ -91,8 +116,14 @@ class F3Pipeline:
         if ic_low is None or ic_low <= 0:
             return False, f"IC_low ≤ 0 (ic_low={ic_low})"
         
-        # Verificar τ ≤ K (K = 20)
-        if tau is None or tau > K_HALF_LIFE_BARS:
+        # Verificar IC_low < θ̂
+        if ic_low >= theta:
+            return False, f"IC_low ({ic_low}) >= θ̂ ({theta})"
+        
+        # Verificar 1 ≤ τ ≤ 20
+        if tau is None or tau < 1:
+            return False, f"τ < 1 (tau={tau})"
+        if tau > K_HALF_LIFE_BARS:
             return False, f"τ > K (tau={tau}, K={K_HALF_LIFE_BARS})"
         
         return True, "Reversal gate passed"
@@ -105,7 +136,7 @@ class F3Pipeline:
         2. Calcular Hurst → diagnóstico (sem hard-gate)
         3. Estimar OU (θ, τ)
         4. Bootstrap θ → IC_low, CV
-        5. Gate: θ̂>0 ∧ IC_low>0 ∧ τ≤K
+        5. Gate: θ̂>0 ∧ IC_low>0 ∧ IC_low<θ̂ ∧ 1≤τ≤20 ∧ ADF(X_t) p<0.05
         
         Returns:
             F3PipelineResult com status e parâmetros
@@ -127,7 +158,6 @@ class F3Pipeline:
         hurst_result = calculate_hurst(self.log_prices)
         
         # H é apenas diagnóstico - não hard-gate
-        # Se H estiver None (warm-up), continuar → será NEUTRO pelo OU/bootstrap
         hurst_value = hurst_result.hurst
         
         # Passo 3: Estimar OU (apenas se REVERSAL ou warm-up)
@@ -145,21 +175,23 @@ class F3Pipeline:
                 metrics={"hurst": hurst_value} if hurst_value else {}
             )
         
-        # Passo 4: Bootstrap θ
-        # Para bootstrap, precisamos de uma série de θs
-        # Usamos o θ estimado como única amostra e aplicamos bootstrap
+        # Passo 3b: Verificar ADF(X_t) p < 0.05
+        adf_passes, p_value_adf_x = self._run_adf_on_x()
+        
+        # Passo 4: Bootstrap θ - Moving Block Bootstrap
+        # Input: X (série de log-preços, janela 200)
         bootstrap_result = bootstrap_theta(
-            thetas=[ou_result.theta] if ou_result.theta else [],
-            n_bootstrap=50,
+            X=self.log_prices,
+            n_bootstrap=100,
             seed=42
         )
         
-        # Passo 5: Gate de reversão T030: θ̂>0 ∧ IC_low>0 ∧ τ≤K
+        # Passo 5: Gate de reversão T030: θ̂>0 ∧ IC_low>0 ∧ IC_low<θ̂ ∧ 1≤τ≤20 ∧ ADF(X_t) p<0.05
         theta_hat = ou_result.theta
         ic_low = bootstrap_result.ic_low
         tau = ou_result.tau
         
-        gate_pass, gate_reason = self._check_reversal_gate(theta_hat, ic_low, tau)
+        gate_pass, gate_reason = self._check_reversal_gate(theta_hat, ic_low, tau, adf_passes)
         
         if not gate_pass:
             return F3PipelineResult(
@@ -169,9 +201,10 @@ class F3Pipeline:
                 theta=theta_hat,
                 tau=tau,
                 bootstrap_cv_theta=bootstrap_result.cv_theta,
+                ic_low=ic_low,
+                p_value_adf_x=p_value_adf_x,
                 is_theta_stable=bootstrap_result.is_stable,
                 forca_penalty_cv=bootstrap_result.forca_penalty_cv,
-                ic_low=ic_low,
                 reason=f"Gate failed: {gate_reason}",
                 metrics={
                     "hurst": hurst_value,
@@ -182,6 +215,7 @@ class F3Pipeline:
                     "ic_low": ic_low,
                     "is_stable": bootstrap_result.is_stable,
                     "penalty_cv": bootstrap_result.forca_penalty_cv,
+                    "p_value_adf_x": p_value_adf_x,
                     "method": ou_result.method,
                 }
             )
@@ -194,9 +228,10 @@ class F3Pipeline:
             theta=theta_hat,
             tau=tau,
             bootstrap_cv_theta=bootstrap_result.cv_theta,
+            ic_low=ic_low,
+            p_value_adf_x=p_value_adf_x,
             is_theta_stable=bootstrap_result.is_stable,
             forca_penalty_cv=bootstrap_result.forca_penalty_cv,
-            ic_low=ic_low,
             reason=None,
             metrics={
                 "hurst": hurst_value,
@@ -207,6 +242,7 @@ class F3Pipeline:
                 "ic_low": ic_low,
                 "is_stable": bootstrap_result.is_stable,
                 "penalty_cv": bootstrap_result.forca_penalty_cv,
+                "p_value_adf_x": p_value_adf_x,
                 "method": ou_result.method,
             }
         )
