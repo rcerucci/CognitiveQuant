@@ -1,0 +1,47 @@
+{
+  "description": "Expected Sharpe table for US4 metrics tests",
+  "instruments": 10,
+  "sharpes": {
+    "EUR/USD": 0.65,
+    "GBP/JPY": 0.45,
+    "USD/CAD": 0.72,
+    "AUD/NZD": 0.38,
+    "US500": 0.55,
+    "GER30": 0.48,
+    "JP225": 0.61,
+    "XAU/USD": 0.52,
+    "USOIL": 0.41,
+    "NAS100": 0.58
+  },
+  "pass_count": 7,
+  "fail_count": 3,
+  "gate_passed": true,
+  "metrics": {
+    "EUR/USD": {
+      "sharpe": 0.65,
+      "wr": 0.52,
+      "pf": 1.45,
+      "maxdd": 0.08,
+      "trigger_rate": 0.08,
+      "tau_median": 4
+    },
+    "GBP/JPY": {
+      "sharpe": 0.45,
+      "wr": 0.43,
+      "pf": 1.25,
+      "maxdd": 0.12,
+      "trigger_rate": 0.06,
+      "tau_median": 5
+    }
+  },
+  "targets": {
+    "sharpe_min": 0.5,
+    "wr_min": 0.45,
+    "pf_min": 1.3,
+    "maxdd_max": 0.15,
+    "trigger_rate_min": 0.05,
+    "trigger_rate_max": 0.15,
+    "tau_median_min": 3,
+    "tau_median_max": 8
+  }
+}
