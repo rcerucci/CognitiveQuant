@@ -2,12 +2,13 @@
 
 **Feature Branch**: `002-f2-filtros-qualidade`  
 **Created**: 2026-09-05  
-**Status**: Approved  
+**Status**: Approved + Addendum 2026-09-06 (ADF em \(r_t\))  
 **Input**: Fatia F2 (Marcos) — consolidado v1.2 §3.3 (+ ordem §5.1 / decisão §5.2)  
 **Fonte**: Documento consolidado v1.2  
 **Depende de**: F1 — saída in-memory (série validada + P_t / X_t / r_t + flags; formato sem `volume`)
 
 **Locks (Marcos)**: Parkinson = clássica high/low · warm-up insuficiente → NEUTRO automático · short-circuit no 1º filtro que falha (ordem §5.1)
+**Addendum (2026-09-06)**: ADF de qualidade em **\(r_t\)** (não em \(X_t\)); lags=5 e p&lt;0.05 **inalterados**; spread/TR/Parkinson inalterados; F3 segue em \(X_t\).
 
 ## Objetivo
 
@@ -23,6 +24,9 @@ Aplicar os filtros de qualidade (pré-condições) do Passo 2 do motor sobre a s
 - UI / onboarding / marketing
 - Lista de instrumentos §9.2 (ainda depois)
 - Fonte/broker OHLC de produção
+- Inventar p-crítico / mudar janela 200 / lags=5
+- ADF no Hurst / mudar cortes 0.45/0.55 (F3)
+- Reabrir F3–F6 além do consumo de PASS
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -41,18 +45,19 @@ Como pipeline do motor, quero rejeitar barras com spread acima de 2× a média d
 
 ---
 
-### US2 — Filtro ADF de estacionariedade (Priority: P1)
+### US2 — Filtro ADF de estacionariedade em \(r_t\) (Priority: P1)
 
-Como pipeline do motor, quero exigir ADF com p < 0.05 na janela `X_{t-199:t}` (lags=5), senão NEUTRO, para não aplicar passos de reversão em série não-estacionária nesta pré-condição.
+Como pipeline do motor, quero exigir ADF com p < 0.05 na janela de **retornos** `r_{t-199:t}` (lags=5), senão NEUTRO — qualidade sobre estacionariedade dos **retornos** (consolidado), não do nível \(X_t\) (~I(1) em FX M30).
 
-**Why this priority**: Segundo na ordem §5.1; custo médio; gate antes de TR/vol.
+**Why this priority**: Segundo na ordem §5.1; intent do addendum 2026-09-06 (ADF(\(X\)) matava ~81% das janelas EUR/USD antes do regime).
 
-**Independent Test**: Série estacionária sintética (p < 0.05) vs tendência/RW (p ≥ 0.05); assert PASS vs NEUTRO; isolado dos outros filtros.
+**Independent Test** (seed=42): série preço ~RW (log-preço I(1), retorno ~branco) → ADF(\(X\)) tipicamente p≥0.05 e ADF(\(r\)) p&lt;0.05; o filtro **passa** no segundo; isolado dos outros filtros F2.
 
 **Acceptance Scenarios**:
 
-1. **Given** janela `X_{t-199:t}` (200 pontos) e ADF com lags=5, **When** `p < 0.05`, **Then** o filtro ADF passa.
-2. **Given** a mesma especificação ADF, **When** `p ≥ 0.05`, **Then** status **NEUTRO**.
+1. **Given** janela de **200 retornos** `r_{t-199:t}` com `r_t = X_t - X_{t-1}` e ADF lags=5, **When** `p < 0.05`, **Then** o filtro ADF passa.
+2. **Given** a mesma especificação ADF em \(r\), **When** `p ≥ 0.05`, **Then** status **NEUTRO**.
+3. **Given** primeira barra da série sem retorno anterior, **When** ADF é solicitado, **Then** **NEUTRO** / skip (sem inventar \(r_0\)).
 
 ---
 
@@ -113,7 +118,7 @@ Como pipeline do motor, quero avaliar 2.1→2.2→2.3→2.4 na ordem §5.1 com *
 
 - **FR-001**: Sistema MUST consumir a saída in-memory do F1 (barra/série validada com bid/ask, OHLC, `X_t`, flags; **sem** `volume`).
 - **FR-002**: Sistema MUST aplicar filtro Spread: `Ask_t - Bid_t ≤ 2 × média(20)`; falha → NEUTRO; warm-up &lt;20 → NEUTRO.
-- **FR-003**: Sistema MUST aplicar ADF em `X_{t-199:t}` com lags=5; condição de passagem `p < 0.05`; falha → NEUTRO; warm-up &lt;200 → NEUTRO.
+- **FR-003**: Sistema MUST aplicar ADF em **`r_{t-199:t}`** (`r_t = X_t - X_{t-1}`) com lags=5; passagem `p < 0.05`; falha → NEUTRO; warm-up &lt;200 retornos → NEUTRO; sem \(r\) na 1ª barra → NEUTRO/skip. MUST NOT usar \(X_t\) como série do ADF de qualidade.
 - **FR-004**: Sistema MUST aplicar TR: `TR_t = max(H-L, |H-C_{t-1}|, |L-C_{t-1}|)` e `TR_t ≤ 2.5 × média(20)`; falha → NEUTRO; warm-up &lt;20 → NEUTRO.
 - **FR-005**: Sistema MUST NOT tratar barras weekend_fill do F1 como TR observado preenchido.
 - **FR-006**: Sistema MUST aplicar vol rolling Parkinson **clássica high/low** `σ_20 / σ_60 ≤ 1.5`; falha → NEUTRO temporário (1 barra) + log `"volatility_spike_detected"`; warm-up &lt;60 → NEUTRO.
@@ -135,6 +140,7 @@ Como pipeline do motor, quero avaliar 2.1→2.2→2.3→2.4 na ordem §5.1 com *
 - **SC-002**: Ordem de avaliação nos testes de US5 segue Spread → ADF → TR → Vol com short-circuit.
 - **SC-003**: Nenhum teste de F2 importa módulos de §3.4+ / TA / executor (escopo fechado).
 - **SC-004**: Barras `weekend_fill` não contribuem TR observado nos testes de US3.
+- **SC-005** (addendum): fixture RW seed=42 — filtro ADF passa em \(r\) e **não** exige passagem em \(X\); spread/TR/Parkinson inalterados nos testes.
 
 ## Riscos
 
@@ -142,16 +148,26 @@ Como pipeline do motor, quero avaliar 2.1→2.2→2.3→2.4 na ordem §5.1 com *
 
 ## DIVERGÊNCIA
 
-- Nenhuma vs F1 aprovado: formato e saída in-memory alinhados.
-- Repo pós-F1: paths de `src/motor/ohlc/` existem; F2 estende Motor em `src/motor/filters/` — paths no `plan.md`.
+- Nenhuma vs F1: formato/saída in-memory.
+- **Addendum vs código vigente:** implementação atual ADF(\(X\)) diverge do intent pós-addendum — hotfix em `filters/adf.py` / pipeline (Plan/Tasks).
+- Paths F2: `src/motor/filters/` — plan hotfix amarra.
 
 ## NEEDS CLARIFICATION
 
-*(fechados por Marcos — recomendados)*
+Nenhum aberto neste addendum.
+
+## Decisões — Addendum ADF (2026-09-06)
+
+1. Série do ADF de qualidade = **\(r_t\)** (não \(X_t\)).
+2. Janela = 200 retornos; lags=5; p&lt;0.05 **iguais**.
+3. Path: `src/motor/filters/adf.py` (+ pipeline) — Plan amarra; Spec não mexe em F3+.
+4. F3 continua estimando regime/OU em **\(X_t\)**.
+
+## Locks anteriores (inalterados)
 
 1. Parkinson → **clássica high/low** (fator \(1/(4\ln 2)\); razão σ20/σ60).
-2. Warm-up → **NEUTRO automático** se série insuficiente para a janela do filtro.
-3. Short-circuit → **sim**, para no 1º filtro que falha na ordem §5.1.
+2. Warm-up → **NEUTRO automático** se série insuficiente.
+3. Short-circuit → **sim**, ordem §5.1.
 
 ## Assumptions
 
