@@ -50,6 +50,7 @@ class LoaderResult:
     loaded_count: int = 0
     rejected_count: int = 0
     rejections: List[str] = field(default_factory=list)
+    message: Optional[str] = None
 
 
 class BacktestLoader:

@@ -149,8 +149,11 @@ class BarRunner:
                 reason="Not enough data for F2 filters",
             )
         
+        # Calculate relative index within the window
+        relative_index = bar_index - window_start
+        
         try:
-            filter_pipeline = Pipeline(filter_bars, index=bar_index)
+            filter_pipeline = Pipeline(filter_bars, index=relative_index)
             f2_result = filter_pipeline.run()
         except Exception as e:
             logger.warning(f"F2 filter error at bar {bar_index}: {e}")
