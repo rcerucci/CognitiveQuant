@@ -1,93 +1,109 @@
-# Implementation Plan: F3 — Hotfix Hurst DFA (addendum 2026-09-06)
+# Implementation Plan: F3 — Hotfix 003b gate de regime (2026-09-06)
 
-**Branch**: `hotfix/003-hurst-dfa` | **Date**: 2026-09-06 | **Spec**: `specs/003-f3-regime-ou-bootstrap/spec.md` (Approved + Addendum Hurst DFA)
+**Branch**: `hotfix/003b-regime-gate` | **Date**: 2026-09-06 | **Spec**: `specs/003-f3-regime-ou-bootstrap/spec.md` (Addendum 003b)
 
-**Input**: Spec Kit `spec.md` pós-fusão (US1 / FR-002 / FR-002a / FR-002b / SC-005)
+**Input**: Spec 003b + **LOCK Marcos** (K / θ / IC)
 
-**Locks (addendum)**: estimador = **DFA** em \(X_t\) (nível) · H := α (log F(s)~α log(s)) · janela **200** · escalas N=200 = **`{8,16,32,64}`** (regra ≥2 segmentos + ≥4 escalas; **128 fora**) · cortes **0.45 / 0.55 iguais** · proibido escala com 1 segmento · fallback R/S (1 estatística/escala válida, sem n de 1 bloco) **só se** DFA falhar aceite B · OU/bootstrap **inalterados** · `seed=42`
+**Locks (Marcos 003b)**:
+- H DFA = **diagnóstico** — **não** abre PASS; `H > 0.55` **não** vira tendência
+- PASS reversão exige **ambos**:
+  1. \(\hat\theta > 0\) **e** (se bootstrap rodou) **IC inferior > 0**
+  2. \(\tau = \ln(2)/\hat\theta \le K\), **K = 20** barras M30
+- Cadeado efetivo: τ≤20 + θ identificável (piso implícito \(\hat\theta \ge \ln2/K \approx 0.0347\) quando τ é meia-vida)
+- Janela Hurst/OU = **200** inalterada
+- Sem F7 · sem run 10×65k neste PR · `seed=42`
 
-**Depende de**: hotfix **002 ADF \(r_t\)** preferencialmente em `main` (ou mergeado antes); F2 PASS + F1; `src/motor/regime/hurst.py` vigente ainda R/S (DIVERGÊNCIA)
-
-**Não reabre**: OU, bootstrap θ, F2 ADF (002 à parte), F4–F6, tendência como sinal
+**Depende de**: F2 ADF \(r_t\) em `main` (#12); estimador DFA Peng em `hurst.py` (hotfix `003-hurst-dfa` / #13 código — se ainda só docs, **basear este branch no código DFA** ou mergear DFA antes). Bootstrap iid 50 / CV 0.30 / μ_θ≈0→NEUTRO **mantidos**.
 
 ## Summary
 
-Substituir Hurst R/S cego por **DFA** em \(X_t\) em `hurst.py`, com escalas trancadas e fallback R/S documentado; acrescentar `tests/unit/test_hurst_sanity.py` A/B/C (branco / OU / RW). Cortes e pipeline F3 (exceto consumo do novo H) intactos.
+Migrar o gate de PASS de faixas H (0.45/0.55) para **OU + meia-vida**: emitir H só como diagnóstico; PASS se θ̂>0, IC inferior bootstrap >0 (quando houver), e τ≤20; senão NEUTRO. Sem path de tendência.
 
 ## Technical Context
 
 **Language/Version**: Python ≥3.11
 
-**Primary Dependencies**: `numpy` (já no projeto) — DFA em puro numpy; **sem** lib nova de fractal. Fallback R/S reusa lógica existente (ajustada: sem n de 1 bloco).
+**Primary Dependencies**: `numpy`, `pykalman` (já no projeto) — **sem** lib nova
 
-**Storage**: N/A — in-memory
+**IC inferior (amarrado)**: percentil empírico **2.5%** das 50 θs bootstrap (IC 95% bilateral); MUST **> 0** para PASS. (Assunção padrão; Marcos pode sobrescrever o percentil.)
 
-**Testing**: `pytest`; `test_hurst_sanity.py` seed=42:
-- A branco → H ∈ [0.35, 0.65]
-- B OU nível θ=0.15 σ=0.2 n≥2000 → **H&lt;0.45** + reversão/PASS
-- C RW → H&gt;0.55 + NEUTRO  
-R/S legado deve **falhar** B (prova do bug). Merge só com B verde no DFA.
+**Testing**: `pytest`; SC-006: τ>20 → NEUTRO; τ≤20 + θ̂ ok + IC_low>0 → PASS **sem** exigir H&lt;0.45; H&gt;0.55 sem tendência
 
 **Constraints**:
-- Input = \(X_t\) (MUST NOT passar \(r_t\) ao gate de regime)
-- Escala inválida se `floor(N/s) < 2`
-- H&gt;0.55 continua **NEUTRO** (não gera sinal)
-- Warm-up &lt;200 → NEUTRO
+- Ordem: DFA (diagnóstico) → OU → **gate θ/τ/IC** → bootstrap (CV flag inalterado)
+- MUST NOT restaurar H hard-gate
+- MUST NOT GARCH/Z/payload/TA/F7/CUSUM
 
 ## Árvore real (`origin/main`) vs hotfix
 
 **Já existe**:
 
 ```text
-src/motor/regime/hurst.py           # hoje R/S 8/16/32/64/128 — SUBSTITUIR núcleo
-src/motor/regime/{ou,bootstrap_theta,pipeline,__init__}.py  # NÃO MEXE (só consumir H)
-tests/unit/test_regime_hurst.py
-tests/fixtures/regime/hurst.json
-specs/003-f3-regime-ou-bootstrap/{spec,plan,tasks}.md
+src/motor/regime/hurst.py              # ainda classifica PASS/NEUTRO por H — MUDA
+src/motor/regime/ou.py                 # τ = ln2/θ; θ≤0 → NEUTRO — estende gate τ≤K
+src/motor/regime/bootstrap_theta.py    # CV / μ_θ — acrescenta IC inferior
+src/motor/regime/pipeline.py           # H hard-gate na orquestração — MUDA
+tests/unit/test_regime_{hurst,ou,bootstrap,pipeline}.py
+tests/unit/test_hurst_sanity.py        # se já existir pós-DFA
+tests/fixtures/regime/
+specs/003-f3-regime-ou-bootstrap/
 ```
 
-**Hotfix adiciona / altera**:
+**Hotfix 003b adiciona / altera**:
 
 ```text
-src/motor/regime/hurst.py                 # DFA + escalas {8,16,32,64} + fallback R/S
-tests/unit/test_hurst_sanity.py           # NOVO — A/B/C SC-005
-tests/unit/test_regime_hurst.py           # alinhar a DFA / escalas
-tests/fixtures/regime/hurst.json          # fixtures DFA / sanity
-specs/003-f3-regime-ou-bootstrap/plan.md  # este arquivo
+src/motor/regime/hurst.py              # H diagnóstico; sem NEUTRO/PASS por faixa 0.45/0.55
+src/motor/regime/ou.py                 # expor τ; falha se τ > K (ou delegar ao pipeline)
+src/motor/regime/bootstrap_theta.py    # IC inferior (p2.5); falha se IC_low ≤ 0
+src/motor/regime/pipeline.py           # ordem 003b; K=20; sem short-circuit por H
+src/motor/regime/__init__.py           # export K / campos novos se preciso
+
+tests/unit/test_regime_pipeline.py     # SC-006 gate τ/θ/IC
+tests/unit/test_regime_ou.py           # τ≤20 / τ>20
+tests/unit/test_regime_bootstrap.py    # IC_low > 0
+tests/unit/test_regime_hurst.py        # H não força PASS/NEUTRO
+tests/fixtures/regime/pipeline.json    # casos τ/K
+tests/fixtures/regime/ou.json
+
+specs/003-f3-regime-ou-bootstrap/plan.md   # este arquivo
 # tasks.md append — Tasks
 ```
+
+**Constante**: `K_HALF_LIFE_BARS = 20` (único lugar canônico — preferência `pipeline.py` ou módulo compartilhado em `regime/`).
 
 ## O que esta fatia MEXE
 
 | Área | Paths |
 |------|--------|
-| Hurst | `src/motor/regime/hurst.py` |
-| Testes | `tests/unit/test_hurst_sanity.py`, `tests/unit/test_regime_hurst.py` |
-| Fixtures | `tests/fixtures/regime/hurst.json` |
+| Gate / orquestração | `src/motor/regime/pipeline.py` |
+| Hurst diagnóstico | `src/motor/regime/hurst.py` |
+| OU / τ | `src/motor/regime/ou.py` |
+| Bootstrap IC | `src/motor/regime/bootstrap_theta.py` |
+| Testes / fixtures | `tests/unit/test_regime_*.py`, `tests/fixtures/regime/` |
 | Spec package | `specs/003-f3-regime-ou-bootstrap/` |
-| Export | `src/motor/regime/__init__.py` só se API pública de Hurst mudar nome (mínimo) |
 
 ## O que NÃO MEXE
 
-- `src/motor/regime/{ou,bootstrap_theta,pipeline}.py` (exceto se só tipagem/import do resultado Hurst)
-- `src/motor/filters/**` (ADF é hotfix 002)
-- `src/motor/{ohlc,vol,signal,backtest}/**`
-- Cortes 0.45/0.55; H&gt;0.55=PASS; F7; run 10×65k
+- Escalas DFA `{8,16,32,64}` / DFA Peng (exceto remover hard-gate H)
+- `src/motor/filters/**`, `ohlc/`, `vol/`, `signal/`, `backtest/`
+- F7 · 10×65k · mudar K sem Marcos · inventar path tendência
 
-## Ordem interna do hotfix
+## Ordem interna
 
 ```text
-hurst.py DFA → fallback R/S → test_hurst_sanity A/B/C → alinhar test_regime_hurst → Tasks append
+hurst diagnóstico → ou (θ,τ) → gate τ≤20 + θ>0
+  → bootstrap (CV + IC_low>0) → pipeline PASS/NEUTRO → testes SC-006
 ```
 
 ## Onde vive o teste
 
 | Item | Path |
 |------|------|
-| SC-005 Independent Test A/B/C | `tests/unit/test_hurst_sanity.py` |
-| US1 regressão Hurst | `tests/unit/test_regime_hurst.py` |
-| Fixtures | `tests/fixtures/regime/hurst.json` |
+| SC-006 Independent Test | `tests/unit/test_regime_pipeline.py` (+ ou/bootstrap) |
+| H sem hard-gate | `tests/unit/test_regime_hurst.py` |
+| Fixtures | `tests/fixtures/regime/{pipeline,ou,bootstrap}.json` |
 
 ## Complexity Tracking
 
-N/A — DFA em numpy; escalas já trancadas no Spec (`{8,16,32,64}`); sem stack inventada.
+- Percentil IC **2.5%** amarrado no plan (Spec não fixou); Marcos sobrescreve se quiser outro.
+- Código `main` ainda pode ter H hard-gate / DFA só em branch — 003b **assume** DFA presente; senão mergear `hotfix/003-hurst-dfa` primeiro.
