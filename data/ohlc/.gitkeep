@@ -1,0 +1,4 @@
+# OHLC Historical Data Directory
+# This directory contains materializado CSV/parquet files for backtesting
+# Provider adapter (OANDA/Polygon/QC/Broker) materializes data here
+# See spec F6 §10.1 - CSV/parquet real, provider = adapter fora do runner

@@ -1,0 +1,89 @@
+{
+  "description": "Expected equity and trades for US3 PnL simulation tests",
+  "test_cases": [
+    {
+      "name": "single_long_entry_exit",
+      "description": "Single LONG trigger with known tau",
+      "scenario": {
+        "trigger_direction": "LONG",
+        "force": 0.75,
+        "confianca": "ALTA",
+        "tau_bars": 5,
+        "entry_bar": {
+          "close": 100.0,
+          "bid": 99.8,
+          "ask": 100.2
+        },
+        "exit_bar": {
+          "close": 102.0,
+          "bid": 101.8,
+          "ask": 102.2
+        }
+      },
+      "expected": {
+        "entry_price": 100.0,
+        "exit_price": 102.0,
+        "retorno": 0.01980262742814134,
+        "position_handled": 1,
+        "entry_bar_index": 1,
+        "exit_bar_index": 6
+      }
+    },
+    {
+      "name": "long_no_flip",
+      "description": "OPEN position with opposite signal does not flip",
+      "scenario": {
+        "trigger_direction": "LONG",
+        "force": 0.70,
+        "confianca": "MÉDIA",
+        "tau_bars": 10,
+        "entry_bar": {
+          "close": 100.0,
+          "bid": 99.8,
+          "ask": 100.2
+        },
+        "intermediate_bar": {
+          "close": 101.5,
+          "bid": 101.3,
+          "ask": 101.7
+        },
+        "opposite_signal_bar": {
+          "close": 102.0,
+          "bid": 101.8,
+          "ask": 102.2
+        }
+      },
+      "expected": {
+        "entry_price": 100.0,
+        "position_maintained": true,
+        "flip_occurred": false,
+        "exit_price": 102.0
+      }
+    },
+    {
+      "name": "short_signal",
+      "description": "SHORT signal with positive return",
+      "scenario": {
+        "trigger_direction": "SHORT",
+        "force": 0.80,
+        "confianca": "ALTA",
+        "tau_bars": 3,
+        "entry_bar": {
+          "close": 100.0,
+          "bid": 99.8,
+          "ask": 100.2
+        },
+        "exit_bar": {
+          "close": 98.0,
+          "bid": 97.8,
+          "ask": 98.2
+        }
+      },
+      "expected": {
+        "entry_price": 100.0,
+        "exit_price": 98.0,
+        "retorno": 0.01980262742814134
+      }
+    }
+  ]
+}
