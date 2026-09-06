@@ -68,3 +68,13 @@
 - [ ] T024 [US1] Implementar fallback R/S (uma estatística por escala, sem n com 1 bloco) se DFA falhar aceite B em `src/motor/regime/hurst.py`
 - [ ] T025 [US1] Escrever teste A/B/C seed=42 (branco / OU H<0.45 / RW H>0.55; R/S atual falha B) em `tests/unit/test_hurst_sanity.py`
 - [ ] T026 [US1] Alinhar Independent Test US1 existente aos cortes DFA em `tests/unit/test_regime_hurst.py`
+
+## Phase hotfix 003b — gate de regime
+
+- [ ] T027 [US1] Tornar H DFA diagnóstico (não hard-gate de PASS; H>0.55 não gera tendência) em `src/motor/regime/hurst.py`
+- [ ] T028 [US3] Expor IC inferior bootstrap (p2.5%) e exigir `IC_low > 0` para elegibilidade em `src/motor/regime/bootstrap_theta.py`
+- [ ] T029 [US2] Garantir θ̂>0 e τ=ln(2)/θ (cadeado τ≤20 no pipeline) em `src/motor/regime/ou.py`
+- [ ] T030 [US4] Implementar PASS reversão = θ̂>0 ∧ IC_low>0 ∧ τ≤20 em `src/motor/regime/pipeline.py`
+- [ ] T031 [P] [US4] Atualizar Independent Test do pipeline (PASS/NEUTRO com K=20) em `tests/unit/test_regime_pipeline.py`
+- [ ] T032 [US1] Alinhar testes Hurst (H não abre PASS sozinho) em `tests/unit/test_regime_hurst.py`
+- [ ] T033 [US3] Cobrir IC_low≤0 → não PASS em `tests/unit/test_regime_bootstrap.py`
