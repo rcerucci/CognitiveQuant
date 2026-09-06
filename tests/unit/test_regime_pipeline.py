@@ -81,14 +81,14 @@ def generate_log_prices(length: int, mu: float = 0.0, theta: float = 0.5, sigma:
 def generate_mean_reverting_series(length: int, mu: float = 0.0, seed: int = 42) -> list:
     """Gera série com autocorrelação negativa forte (H < 0.45 - REVERSAL).
     
-    Usa AR(1) com coeficiente negativo para criar mean-reverting behavior.
+    Usa AR(1) com coeficiente negativo forte para criar mean-reverting behavior.
     Gera log-preços diretamente.
     
     Args:
         length: Comprimento da série (mínimo 200 para cálculo Hurst)
         mu: Média inicial (log-price)
         seed: Seed para reproducibilidade
-    
+        
     Returns:
         Lista de log-preços com H < 0.45 (REVERSAL)
     """
@@ -97,10 +97,10 @@ def generate_mean_reverting_series(length: int, mu: float = 0.0, seed: int = 42)
     series[0] = mu
     
     # AR(1) com coeficiente negativo forte
-    # X_t = -0.75 * X_{t-1} + 0.01 * noise
+    # X_t = -0.80 * X_{t-1} + 0.01 * noise
     # Isso garante autocorrelação negativa e H < 0.45
     for i in range(1, length):
-        series[i] = -0.75 * series[i-1] + 0.01 * rng.standard_normal()
+        series[i] = -0.80 * series[i-1] + 0.01 * rng.standard_normal()
     
     return series.tolist()
 

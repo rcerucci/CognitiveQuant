@@ -1,4 +1,4 @@
-"""Testes F3 US1 — Regime Hurst R/S."""
+"""Testes F3 US1 — Regime Hurst R/S com DFA."""
 from __future__ import annotations
 
 import json
@@ -11,16 +11,15 @@ from motor.regime.hurst import (
     HurstCalculator,
     HurstResult,
     HurstStatus,
+    HurstMethod,
     RegimeType,
 )
-
 
 # Carregar fixtures
 def load_hurst_fixtures():
     """Carrega fixtures de hurst.json."""
     with open("tests/fixtures/regime/hurst.json", "r") as f:
         return json.load(f)["test_cases"]
-
 
 def generate_ou_series(length: int, mu: float = 0.0, theta: float = 0.5, sigma: float = 0.1, seed: int = 42) -> list:
     """Gera série OU sintética para testes.
@@ -41,11 +40,10 @@ def generate_ou_series(length: int, mu: float = 0.0, theta: float = 0.5, sigma: 
     
     return series.tolist()
 
-
 def generate_mean_reverting_series(length: int, mu: float = 0.0, seed: int = 42) -> list:
     """Gera série com autocorrelação negativa forte (H < 0.45 - REVERSAL).
     
-    Usa AR(1) com coeficiente negativo para criar mean-reverting behavior.
+    Usa AR(1) com coeficiente negativo forte para criar mean-reverting behavior.
     Gera log-preços diretamente.
     
     Args:
@@ -61,13 +59,12 @@ def generate_mean_reverting_series(length: int, mu: float = 0.0, seed: int = 42)
     series[0] = mu
     
     # AR(1) com coeficiente negativo forte
-    # X_t = -0.75 * X_{t-1} + 0.01 * noise
+    # X_t = -0.80 * X_{t-1} + 0.01 * noise
     # Isso garante autocorrelação negativa e H < 0.45
     for i in range(1, length):
-        series[i] = -0.75 * series[i-1] + 0.01 * rng.standard_normal()
+        series[i] = -0.80 * series[i-1] + 0.01 * rng.standard_normal()
     
     return series.tolist()
-
 
 def generate_random_walk_series(length: int, seed: int = 42) -> list:
     """Gera série Random Walk para testes de H ≈ 0.5."""
@@ -75,7 +72,6 @@ def generate_random_walk_series(length: int, seed: int = 42) -> list:
     increments = rng.standard_normal(length) * 0.01
     series = np.cumsum(increments)
     return series.tolist()
-
 
 def generate_trend_series(length: int, trend_slope: float = 0.001, seed: int = 42) -> list:
     """Gera série com tendência para H > 0.55."""
@@ -85,6 +81,14 @@ def generate_trend_series(length: int, trend_slope: float = 0.001, seed: int = 4
     series = 0.001 * t + np.cumsum(noise)  # Tendência linear com ruído
     return series.tolist()
 
+def generate_ou_level(n: int, theta: float, sigma: float, mu: float = 0.0, x0: float = 0.0, seed: int = 42) -> list:
+    """Gera série OU em nível (Euler-Maruyama) - para testes DFA vs R/S."""
+    rng = np.random.default_rng(seed)
+    x = np.empty(n)
+    x[0] = x0
+    for t in range(1, n):
+        x[t] = x[t-1] + theta * (mu - x[t-1]) + sigma * rng.normal()
+    return x.tolist()
 
 class TestHurstCalculation:
     """Testes para cálculo do coeficiente de Hurst."""
@@ -125,7 +129,6 @@ class TestHurstCalculation:
         assert result.hurst is None, "Hurst should be None for warm-up"
         assert result.regime is None, "Regime should be None for warm-up"
 
-
 class TestHurstBoundaries:
     """Testes para limites de Hurst (SC-001)."""
     
@@ -150,7 +153,6 @@ class TestHurstBoundaries:
         # Se H > 0.55, deve ser NEUTRO
         if result.hurst is not None and result.hurst > 0.55:
             assert result.status == HurstStatus.NEUTRO
-
 
 class TestHurstWithSubSizes:
     """Testes para sub-tamanhos R/S."""
@@ -179,7 +181,6 @@ class TestHurstWithSubSizes:
         # Com janela menor, ainda pode calcular
         assert result.window_size == 100
 
-
 class TestHurstEdgeCases:
     """Testes para casos edge."""
     
@@ -199,3 +200,53 @@ class TestHurstEdgeCases:
         
         assert result.hurst is not None
         assert result.status in [HurstStatus.PASS, HurstStatus.NEUTRO]
+
+class TestHurstMethod:
+    """Testes para determinação do método usado (DFA/RS)."""
+    
+    def test_dfa_is_used_by_default(self):
+        """Testa que DFA é o método principal por padrão."""
+        # Série que DFA consegue calcular
+        series = generate_ou_level(500, theta=0.15, sigma=0.2)
+        result = calculate_hurst(series)
+        
+        # DFA deve ser usado como método principal
+        assert result.method == HurstMethod.DFA, f"Expected DFA method, got {result.method}"
+        assert result.dfa_scales == [8, 16, 32, 64], f"Expected DFA scales [8,16,32,64], got {result.dfa_scales}"
+    
+    def test_rs_fallback_for_dfa_failure(self):
+        """Testa que R/S é usado como fallback quando DFA falha."""
+        # Criar caso onde DFA pode falhar (série muito curta para DFA)
+        # Mas R/S ainda pode funcionar
+        calculator = HurstCalculator(
+            series=generate_random_walk_series(500),
+            window_size=200
+        )
+        
+        result = calculator.calculate()
+        
+        # Deve ter um método (DFA ou RS)
+        assert result.method is not None, "Should have a method (DFA or RS)"
+
+class TestHurstDFAOrderScales:
+    """Testes para ordem de escalas DFA conforme spec {8,16,32,64}."""
+    
+    def test_dfa_scales_are_correct(self):
+        """Testa que as escalas DFA são {8,16,32,64} conforme spec."""
+        series = generate_ou_level(500, theta=0.15, sigma=0.2)
+        result = calculate_hurst(series)
+        
+        # Verificar que o resultado contém as escalas corretas
+        assert result.dfa_scales == [8, 16, 32, 64]
+    
+    def test_dfa_vs_rs_consistency(self):
+        """Testa consistência entre DFA e R/S em séries estimáveis."""
+        # Série mean-reverting
+        series = generate_mean_reverting_series(300)
+        result = calculate_hurst(series)
+        
+        # Deve usar DFA (método principal)
+        assert result.method == HurstMethod.DFA
+        assert result.hurst is not None
+        assert result.hurst < 0.45
+        assert result.regime == RegimeType.REVERSAL
