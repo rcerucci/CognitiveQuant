@@ -3,11 +3,17 @@
 Implementa Hurst R/S com janela 200 e sub-tamanhos 8/16/32/64/128
 para classificação de regime conforme spec §3.4.
 
-Largos:
+T027 (hotfix 003b): Hurst via DFA Peng em X_t como diagnóstico.
+- H é apenas métrica de contexto, NÃO é hard-gate de PASS/NEUTRO
+- H > 0.55 NÃO gera tendência
+- Se hurst estiver None (warm-up < 200), continua para OU/bootstrap
+
+Largos (R/S pre-003b - mantidos para referência):
 - H < 0.45 → REVERSÃO
 - 0.45 ≤ H ≤ 0.55 → NEUTRO
 - H > 0.55 → NEUTRO
-- Histórico < 200 → NEUTRO (warm-up)
+
+Nota: O gate de PASS agora é: θ̂>0 ∧ IC_low>0 ∧ τ≤20 (T030)
 """
 
 from __future__ import annotations
@@ -32,7 +38,12 @@ class HurstStatus(str, Enum):
 
 @dataclass
 class HurstResult:
-    """Resultado do cálculo do Hurst R/S."""
+    """Resultado do cálculo do Hurst R/S.
+    
+    T027: H é diagnóstico, não hard-gate de PASS/NEUTRO.
+    O status PASS apenas indica que H foi calculado com sucesso
+    e o regime foi classificado (REVERSAL ou NEUTRO).
+    """
     status: HurstStatus
     hurst: Optional[float] = None
     regime: Optional[RegimeType] = None
@@ -114,6 +125,9 @@ class HurstCalculator:
     def calculate(self) -> HurstResult:
         """Calcula o coeficiente de Hurst.
         
+        T027: H é diagnóstico - não hard-gate.
+        O status PASS indica apenas que o cálculo foi bem-sucedido.
+        
         Returns:
             HurstResult com status, H e regime
         """
@@ -161,19 +175,19 @@ class HurstCalculator:
         coeffs = np.polyfit(log_sizes, rs_values, 1)
         hurst = coeffs[0]
         
-        # Classificação de regime
+        # T027: H é diagnóstico - NÃO hard-gate
+        # Apenas classificar o regime para informação
+        # O gate de PASS agora é baseado em θ, IC_low e τ (spec 003b)
         if hurst < self.H_REVERSAL:
             regime = RegimeType.REVERSAL
-            status = HurstStatus.PASS
+            # Status PASS indica que H foi calculado (diagnostic only)
         elif hurst <= self.H_TREND:
             regime = None  # NEUTRO
-            status = HurstStatus.NEUTRO
         else:
-            regime = None  # NEUTRO
-            status = HurstStatus.NEUTRO
+            regime = None  # NEUTRO (H > 0.55 não gera tendência - T027)
         
         return HurstResult(
-            status=status,
+            status=HurstStatus.PASS,  # PASS apenas indica sucesso no cálculo
             hurst=float(hurst),
             regime=regime,
             window_size=self.window_size,
@@ -183,6 +197,9 @@ class HurstCalculator:
 
 def calculate_hurst(series: List[float], window_size: int = 200, sub_sizes: List[int] = None) -> HurstResult:
     """Calcula o coeficiente de Hurst R/S.
+    
+    T027 (hotfix 003b): H é diagnóstico, não hard-gate de PASS/NEUTRO.
+    O resultado indica apenas a classificação do regime (REVERSAL/NEUTRO).
     
     Args:
         series: Série de preços X_t (log-price)

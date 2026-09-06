@@ -36,6 +36,47 @@
         "theta_positive": true,
         "tau_positive": true
       }
+    },
+    {
+      "name": "tau_le_20_pass",
+      "description": "Teste T030: τ ≤ 20 e θ̂>0 e IC_low>0 → PASS",
+      "f2_status": "PASS",
+      "series_type": "ou_valid",
+      "expected": {
+        "status": "PASS",
+        "tau_le_20": true,
+        "theta_positive": true,
+        "ic_low_positive": true
+      }
+    },
+    {
+      "name": "tau_gt_20_neutro",
+      "description": "Teste T030: τ > 20 → NEUTRO independente de outros fatores",
+      "f2_status": "PASS",
+      "tau_threshold": 20,
+      "expected": {
+        "status": "NEUTRO",
+        "reason": "tau_exceeds_k"
+      }
+    },
+    {
+      "name": "ic_low_le_0_neutro",
+      "description": "Teste T033: IC_low ≤ 0 → NEUTRO",
+      "f2_status": "PASS",
+      "expected": {
+        "status": "NEUTRO",
+        "reason": "ic_low_le_0"
+      }
+    },
+    {
+      "name": "theta_le_0_neutro",
+      "description": "Teste: θ ≤ 0 → NEUTRO",
+      "f2_status": "PASS",
+      "series_type": "theta_negative",
+      "expected": {
+        "status": "NEUTRO",
+        "theta": 0.0
+      }
     }
   ]
 }

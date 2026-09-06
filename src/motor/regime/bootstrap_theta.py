@@ -7,6 +7,7 @@ Regras:
 - CV ≤ 0.30 → θ estável
 - CV > 0.30 → flag forca_penalty_cv sem NEUTRO
 - μ_θ ≈ 0 → NEUTRO
+- IC_low (p2.5%) > 0 → elegível para PASS
 - seed = 42
 """
 
@@ -34,6 +35,7 @@ class BootstrapResult:
     cv_theta: Optional[float] = None
     is_stable: Optional[bool] = None
     forca_penalty_cv: bool = False
+    ic_low: Optional[float] = None  # Percentil 2.5% das samples
     seed: int = 42
 
 
@@ -45,18 +47,21 @@ class BootstrapTheta:
     CV_THRESHOLD = 0.30
     MU_THRESHOLD = 0.05  # μ_θ ≈ 0 considerado neutro (5% de margem)
     SEED = 42
+    IC_PERCENTILE = 2.5  # Percentil inferior 95% CI
     
-    def __init__(self, thetas: List[float], n_bootstrap: int = None, seed: int = None):
+    def __init__(self, thetas: List[float], n_bootstrap: int = None, seed: int = None, ic_percentile: float = None):
         """Inicializa o bootstrap.
         
         Args:
             thetas: Lista de estimativas de θ (ou vetor de θs)
             n_bootstrap: Número de reamostragens (default 50)
             seed: Seed para reproducibilidade
+            ic_percentile: Percentil para IC inferior (default 2.5)
         """
         self.thetas = np.array(thetas, dtype=np.float64)
         self.n_bootstrap = n_bootstrap or self.N_BOOTSTRAP
         self.seed = seed if seed is not None else self.SEED
+        self.ic_percentile = ic_percentile if ic_percentile is not None else self.IC_PERCENTILE
     
     def run(self) -> BootstrapResult:
         """Executa bootstrap IID e calcula CV.
@@ -75,20 +80,33 @@ class BootstrapTheta:
                 mu_theta=0.0,
                 sigma_theta=0.0,
                 cv_theta=None,
-                is_stable=False
+                is_stable=False,
+                ic_low=0.0
             )
         
         # Se apenas um θ, não faz sentido bootstrap
         if len(self.thetas) == 1:
             theta = float(self.thetas[0])
+            if theta <= 0:
+                return BootstrapResult(
+                    status=BootstrapStatus.NEUTRO,
+                    theta_samples=[theta],
+                    mu_theta=theta,
+                    sigma_theta=0.0,
+                    cv_theta=0.0,
+                    is_stable=True,
+                    forca_penalty_cv=False,
+                    ic_low=theta
+                )
             return BootstrapResult(
-                status=BootstrapStatus.NEUTRO if theta <= 0 else BootstrapStatus.PASS,
+                status=BootstrapStatus.PASS,
                 theta_samples=[theta],
                 mu_theta=theta,
                 sigma_theta=0.0,
                 cv_theta=0.0,
                 is_stable=True,
-                forca_penalty_cv=False
+                forca_penalty_cv=False,
+                ic_low=theta
             )
         
         # Calcular estatísticas diretamente dos thetas originais
@@ -96,13 +114,16 @@ class BootstrapTheta:
         mu_theta = float(np.mean(self.thetas))
         sigma_theta = float(np.std(self.thetas, ddof=0))
         
-        # Bootstrap IID: gerar samples para validação (não usa para CV)
+        # Bootstrap IID: gerar samples para cálculo de IC
         bootstrap_thetas = []
         for _ in range(self.n_bootstrap):
             # Amostrar com substituição para gerar theta de bootstrap
             sample_indices = rng.choice(len(self.thetas), size=len(self.thetas), replace=True)
             sample = self.thetas[sample_indices]
             bootstrap_thetas.append(float(np.mean(sample)))
+        
+        # Calcular IC inferior (percentil 2.5%)
+        ic_low = float(np.percentile(bootstrap_thetas, self.ic_percentile))
         
         # CV = σ_θ / μ_θ
         if abs(mu_theta) > self.MU_THRESHOLD:
@@ -122,11 +143,25 @@ class BootstrapTheta:
                 sigma_theta=sigma_theta,
                 cv_theta=None,
                 is_stable=False,
+                ic_low=ic_low,
                 forca_penalty_cv=False
             )
         
+        # Verificar IC_low ≤ 0 → NEUTRO (T033)
+        if ic_low <= 0:
+            return BootstrapResult(
+                status=BootstrapStatus.NEUTRO,
+                theta_samples=bootstrap_thetas,
+                mu_theta=mu_theta,
+                sigma_theta=sigma_theta,
+                cv_theta=cv_theta,
+                is_stable=False,
+                ic_low=ic_low,
+                forca_penalty_cv=cv_theta > self.CV_THRESHOLD if cv_theta else False
+            )
+        
         # CV > 0.30 → marca penalização mas continua
-        if cv_theta > self.CV_THRESHOLD:
+        if cv_theta is not None and cv_theta > self.CV_THRESHOLD:
             return BootstrapResult(
                 status=BootstrapStatus.PASS,
                 theta_samples=bootstrap_thetas,
@@ -134,6 +169,7 @@ class BootstrapTheta:
                 sigma_theta=sigma_theta,
                 cv_theta=cv_theta,
                 is_stable=False,
+                ic_low=ic_low,
                 forca_penalty_cv=True
             )
         
@@ -145,20 +181,22 @@ class BootstrapTheta:
             sigma_theta=sigma_theta,
             cv_theta=cv_theta,
             is_stable=True,
+            ic_low=ic_low,
             forca_penalty_cv=False
         )
 
 
-def bootstrap_theta(thetas: List[float], n_bootstrap: int = 50, seed: int = 42) -> BootstrapResult:
+def bootstrap_theta(thetas: List[float], n_bootstrap: int = 50, seed: int = 42, ic_percentile: float = 2.5) -> BootstrapResult:
     """Executa bootstrap IID para θ.
     
     Args:
         thetas: Lista de estimativas de θ
         n_bootstrap: Número de reamostragens (default 50)
         seed: Seed para reproducibilidade (default 42)
+        ic_percentile: Percentil para IC inferior (default 2.5)
         
     Returns:
         BootstrapResult com CV e flags
     """
-    boot = BootstrapTheta(thetas, n_bootstrap, seed)
+    boot = BootstrapTheta(thetas, n_bootstrap, seed, ic_percentile)
     return boot.run()
