@@ -53,3 +53,9 @@
 - [ ] T023 Exportar API pública dos filtros em `src/motor/filters/__init__.py`
 - [ ] T024 [P] Reexportar `filters` em `src/motor/__init__.py`
 - [ ] T025 Verificar SC-001–SC-004 (NEUTRO nos limiares, ordem §5.1, escopo sem §3.4+, weekend_fill sem TR) via suite em `tests/unit/test_filter_*.py`
+## Phase hotfix: US2 — ADF em r_t (addendum)
+
+- [ ] T026 [US2] Alterar ADF para série `r_{t-199:t}` (lags=5; p<0.05; sem retorno → NEUTRO/skip) em `src/motor/filters/adf.py`
+- [ ] T027 [US2] Passar `r_t` (não `X_t`) ao ADF em `src/motor/filters/pipeline.py`
+- [ ] T028 [P] [US2] Atualizar fixtures RW/log-preço I(1) vs retorno ~branco em `tests/fixtures/filters/adf.json`
+- [ ] T029 [US2] Atualizar Independent Test US2 (ADF(X) falha / ADF(r) passa; seed=42) em `tests/unit/test_filter_adf.py`

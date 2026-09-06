@@ -1,160 +1,86 @@
-# Implementation Plan: F2 — Filtros de qualidade
+# Implementation Plan: F2 — Hotfix ADF em \(r_t\) (addendum 2026-09-06)
 
-**Branch**: `002-f2-filtros-qualidade` | **Date**: 2026-09-05 | **Spec**: `specs/002-f2-filtros-qualidade/spec.md`
+**Branch**: `hotfix/002-adf-rt` | **Date**: 2026-09-06 | **Spec**: `specs/002-f2-filtros-qualidade/spec.md` (Approved + Addendum ADF \(r_t\))
 
-**Input**: Feature specification from `/specs/002-f2-filtros-qualidade/spec.md`
+**Input**: Spec Kit `spec.md` pós-fusão do addendum (US2 / FR-003 / SC-005)
 
-**Locks (Marcos)**: Parkinson = clássica high/low · warm-up insuficiente → NEUTRO automático · short-circuit no 1º filtro que falha (ordem §5.1)
+**Locks (addendum)**: série ADF = **\(r_t = X_t - X_{t-1}\)** · janela **200 retornos** · lags=**5** · p&lt;**0.05** iguais · warm-up &lt;200 retornos → NEUTRO · 1ª barra sem \(r\) → NEUTRO/skip · Spread/TR/Parkinson **inalterados** · F3 segue em \(X_t\) · `seed=42` no aceite
 
-**Depende de**: F1 — saída in-memory em `src/motor/ohlc/` (já em `main`)
+**Depende de**: F1 `src/motor/ohlc/` (já em `main`); código F2 vigente em `main` (ADF ainda em \(X_t\) — DIVERGÊNCIA do addendum)
+
+**Ordem vs 003**: aplicar **este hotfix antes** do Hurst DFA (003), para o filtro de qualidade não matar barras antes do regime.
 
 ## Summary
 
-Implementar o Passo 2 do **Motor** (filtros §3.3 / ordem §5.1): Spread → ADF → TR → Vol Parkinson, sobre a série F1 in-memory. Resultado PASS ou NEUTRO(/temporário) com motivo; short-circuit no primeiro filtro que falha. Sem volume, sem Hurst/OU/GARCH/TA/executor. Estende `src/motor/` pós-F1 — não recria scaffold.
+Trocar o input do `FilterADF` de log-preço \(X_t\) para retornos \(r_t\), ajustar a extração no `filters/pipeline.py`, atualizar testes/fixtures US2 + SC-005. Não reabre F3–F6; não muda outros filtros F2.
 
 ## Technical Context
 
-**Language/Version**: Python (Camada 1 — consolidado §2.3; mesma stack F1 / `pyproject.toml` existente)
+**Language/Version**: Python ≥3.11 (`pyproject.toml` em `main`)
 
-**Primary Dependencies (F2)**:
-- stdlib + tipagem
-- `statsmodels` — ADF (consolidado §12 / refs Python statsmodels)
-- F1: `src/motor/ohlc/` (consumo in-memory; **sem** reinventar validação/transform)
+**Primary Dependencies**: `statsmodels.tsa.stattools.adfuller` (já no projeto) — **sem** lib nova
 
-**Parkinson (lock)**: estimador clássico high/low (glossário §12: “usando high/low”). Por barra: \(\ln(H_t/L_t)^2\); \(\sigma_n\) = RMS na janela \(n\) com fator \(1/(4\ln 2)\) (definição clássica Parkinson). Razão \(\sigma_{20}/\sigma_{60} \leq 1.5\).
+**Storage**: N/A — in-memory
 
-**Storage**: N/A — saída **in-memory** (mesmo lock F1).
-
-**Testing**: `pytest` (já no projeto F1). Fixtures em `tests/fixtures/filters/`.
-
-**Target Platform**: Host do motor (library Python).
-
-**Project Type**: library — Option 1 Spec Kit (single project), extensão do pacote `src/motor/`.
+**Testing**: `pytest`; fixture RW seed=42 — ADF(\(r\)) passa; não exigir passagem em \(X\)
 
 **Constraints**:
-- Ordem §5.1: Spread → ADF → TR → Vol rolling
-- Warm-up: <20 (spread/TR média), <200 (ADF), <60 (Parkinson 60) → **NEUTRO** automático (não avalia o filtro incompleto)
-- Short-circuit: para no 1º filtro que falha; motivo = esse filtro
-- weekend_fill do F1: **não** conta como TR observado
-- Falha de filtro = NEUTRO (2.4 = NEUTRO temporário 1 barra + `"volatility_spike_detected"`), **não** Abort de formato F1
-- Entrada com `gap_dados`/NEUTRO F1 → F2 **não** promove a PASS
+- Ordem §5.1 inalterada: Spread → ADF → TR → Parkinson
+- MUST NOT usar \(X_t\) como série do ADF de qualidade
+- MUST NOT mudar limiar p, lags, janela numérica (200), spread/TR/Parkinson
 
-**Scale/Scope**: US1–US5 da spec F2; limiares só os do doc (§3.3).
+## Árvore real (`origin/main`) vs hotfix
 
-## Constitution Check
-
-Gates §2.2 / fail-safe (sem `constitution.md` versionado):
-
-- Só Motor; zero TA/executor.
-- NEUTRO ≠ Abort de formato.
-- Escopo fechado: sem §3.4+.
-
-**Gate**: PASS após F1 em `main`.
-
-## Árvore real (pós-F1 em `main`) vs o que F2 adiciona
-
-**Já existe (não recriar Setup de zero)**:
+**Já existe** (consumir / editar pontualmente):
 
 ```text
-pyproject.toml
-src/motor/__init__.py
-src/motor/ohlc/
-  __init__.py
-  validation.py
-  sync.py
-  transform.py
-tests/unit/test_ohlc_*.py
-tests/fixtures/ohlc/
-specs/001-f1-validacao-ohlc-transform/
+src/motor/filters/adf.py          # hoje: ADF(X_t) — MUDA input
+src/motor/filters/pipeline.py     # hoje: monta X_t e passa ao ADF — MUDA extração → r_t
+src/motor/filters/{spread,tr,parkinson,__init__}.py  # NÃO MEXE
+tests/unit/test_filter_adf.py
+tests/fixtures/filters/adf.json
+specs/002-f2-filtros-qualidade/{spec,plan,tasks}.md
 ```
 
-**F2 adiciona** (paths novos sob o Motor existente):
+**Hotfix adiciona / altera**:
 
 ```text
-src/motor/filters/
-  __init__.py
-  spread.py          # US1
-  adf.py             # US2
-  tr.py              # US3 (+ weekend_fill)
-  parkinson.py       # US4
-  pipeline.py        # US5 orquestra + short-circuit
-
-tests/unit/
-  test_filter_spread.py
-  test_filter_adf.py
-  test_filter_tr.py
-  test_filter_parkinson.py
-  test_filter_pipeline.py
-
-tests/fixtures/filters/
-  spread.json
-  adf.json
-  tr.json
-  parkinson.json
-  pipeline.json
+src/motor/filters/adf.py              # aceitar r_t / documentar janela de retornos
+src/motor/filters/pipeline.py         # r_t = ΔX; warm-up &lt;200 retornos; skip 1ª barra
+tests/unit/test_filter_adf.py         # SC-005 + US2 em r
+tests/fixtures/filters/adf.json       # série RW / retornos alinhados
+specs/002-f2-filtros-qualidade/plan.md # este arquivo
+# tasks.md append — Tasks (não Plan)
 ```
-
-**Dependência de pacote**: acrescentar `statsmodels` em `pyproject.toml` (ADF). Sem `arch`/TradingAgents/MCP.
-
-## Project Structure
-
-### Documentation (this feature)
-
-```text
-specs/002-f2-filtros-qualidade/
-├── plan.md              # este arquivo
-├── spec.md              # Spec (entregue)
-└── tasks.md             # Tasks (próximo — NÃO gerado aqui)
-```
-
-**Structure Decision**: Novo subpacote `src/motor/filters/` ao lado de `ohlc/` — F1 permanece intacto; F3+ continua em `src/motor/` sem misturar TA.
 
 ## O que esta fatia MEXE
 
 | Área | Paths |
 |------|--------|
+| ADF | `src/motor/filters/adf.py` |
+| Pipeline F2 | `src/motor/filters/pipeline.py` (só passagem de série ao ADF) |
+| Testes / fixtures | `tests/unit/test_filter_adf.py`, `tests/fixtures/filters/adf.json` |
 | Spec package | `specs/002-f2-filtros-qualidade/` |
-| Filtros | `src/motor/filters/{spread,adf,tr,parkinson,pipeline}.py` |
-| Deps | `pyproject.toml` (+ `statsmodels`) |
-| Testes | `tests/unit/test_filter_*.py` + `tests/fixtures/filters/` |
-| Export | `src/motor/filters/__init__.py` (+ opcional reexport em `src/motor/__init__.py`) |
 
-## O que esta fatia NÃO MEXE
+## O que NÃO MEXE
 
-- `src/motor/ohlc/**` (exceto **consumir** API pública F1)
-- Hurst / OU / bootstrap θ / GARCH / Z / payload — **F3–F5**
-- Backtest / TA / executor / FTMO — **F6–F9**
-- `volume` / OHLCV
-- UI, broker de produção, lista §9.2
-- Paths fora da árvore acima
+- `src/motor/filters/{spread,tr,parkinson}.py`
+- `src/motor/{ohlc,regime,vol,signal,backtest}/**`
+- Limiares p/lags/janela; F3 Hurst/OU; F4–F6; F7
 
-## Dependências e ordem no pipeline do sistema
+## Ordem interna do hotfix
 
 ```text
-[F1 Motor: OHLC + transform]  ← já em main
-        ↓
-[F2 Filtros §3.3]  ← ESTA FATIA
-        ↓
-[F3 Regime+OU] → [F4 GARCH+Z] → [F5 Payload]
-        ↓
-[F6 Backtest] → [F7 TA] → [F8 Executor] → [F9 FTMO]
+adf.py (input r_t) → pipeline.py (extrai r) → testes/fixtures SC-005 → Tasks append
 ```
-
-Dentro de F2 (lógica): **Setup deps/pastas → spread → adf → tr → parkinson → pipeline (short-circuit) → testes por US**.
 
 ## Onde vive o teste
 
-| US | Independent Test → arquivo |
-|----|----------------------------|
-| US1 | `tests/unit/test_filter_spread.py` |
-| US2 | `tests/unit/test_filter_adf.py` |
-| US3 | `tests/unit/test_filter_tr.py` |
-| US4 | `tests/unit/test_filter_parkinson.py` |
-| US5 | `tests/unit/test_filter_pipeline.py` |
-| Fixtures | `tests/fixtures/filters/` |
-
-Runner: `pytest` na raiz (já F1).
+| Item | Path |
+|------|------|
+| US2 / SC-005 Independent Test | `tests/unit/test_filter_adf.py` |
+| Fixture | `tests/fixtures/filters/adf.json` |
 
 ## Complexity Tracking
 
-N/A — extensão natural do Motor; `statsmodels` justificado pelo consolidado (ADF), não stack nova inventada.
+N/A — mudança de intent/série; mesma API statsmodels; sem stack nova.
