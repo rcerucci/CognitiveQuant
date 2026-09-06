@@ -3,10 +3,10 @@
 Módulo responsável por:
 - Calcular Hurst (R/S) para classificar regime
 - Estimar processo OU via Kalman com fallback MLE
-- Bootstrap IID para medir estabilidade de θ
-- Pipeline completo com gate θ̂>0 ∧ IC_low>0 ∧ τ≤K (003b)
+- Moving Block Bootstrap para medir estabilidade de θ
+- Pipeline completo com gate θ̂>0 ∧ IC_low>0 ∧ IC_low<θ̂ ∧ 1≤τ≤20 ∧ ADF(X_t) p<0.05 (003b)
 
-T027-T033 (hotfix 003b): Gate de regime baseado em OU/τ em vez de Hurst
+T027-T033 (hotfix 003b): Gate de regime baseado em θ̂, IC_low, τ, ADF(X_t)
 """
 
 __version__ = "0.1.0"
