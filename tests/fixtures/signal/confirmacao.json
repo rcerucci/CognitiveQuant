@@ -1,0 +1,120 @@
+{
+  "test_cases": [
+    {
+      "name": "acf_positive_confirms_reversal",
+      "description": "ACF(1) positivo confirma reversão LONG",
+      "returns_type": "mean_reverting",
+      "bar": [1704067200000, 100.0, 102.0, 98.5, 101.0, 100.8, 101.2],
+      "direction": "LONG",
+      "expected": {
+        "rho_1_positive": true,
+        "status": "PASS"
+      }
+    },
+    {
+      "name": "acf_negative_soft_gate",
+      "description": "ACF(1) negativo é penalizado mas não hard-gate (soft gate)",
+      "returns_type": "trending",
+      "bar": [1704067200000, 100.0, 102.0, 98.5, 101.0, 100.8, 101.2],
+      "direction": "LONG",
+      "expected": {
+        "rho_1_negative": true,
+        "status": "PASS"
+      }
+    },
+    {
+      "name": "lb_pvalue_fail",
+      "description": "Ljung-Box p-value >= 0.05 → NEUTRO (hard gate 8.2)",
+      "returns_type": "white_noise",
+      "bar": [1704067200000, 100.0, 102.0, 98.5, 101.0, 100.8, 101.2],
+      "direction": "LONG",
+      "expected": {
+        "lb_pvalue_low": false,
+        "status": "NEUTRO",
+        "reason_contains": "Ljung-Box"
+      }
+    },
+    {
+      "name": "clv_fail",
+      "description": "CLV <= 0.30 → NEUTRO (hard gate 8.3)",
+      "returns_type": "mean_reverting",
+      "bar": [1704067200000, 100.0, 101.0, 99.0, 100.0, 100.0, 100.5],
+      "direction": "LONG",
+      "expected": {
+        "clv_low": true,
+        "status": "NEUTRO",
+        "reason_contains": "CLV"
+      }
+    },
+    {
+      "name": "rb_fail",
+      "description": "RB <= 0.50 → NEUTRO (hard gate 8.4)",
+      "returns_type": "mean_reverting",
+      "bar": [1704067200000, 100.0, 100.2, 99.8, 100.1, 100.0, 100.2],
+      "direction": "LONG",
+      "expected": {
+        "rb_low": true,
+        "status": "NEUTRO",
+        "reason_contains": "RB"
+      }
+    },
+    {
+      "name": "skewness_extrema_long",
+      "description": "Skewness < -2.0 para LONG → NEUTRO (8.6 abort)",
+      "returns_type": "skewed_negative",
+      "bar": [1704067200000, 100.0, 102.0, 98.5, 101.0, 100.8, 101.2],
+      "direction": "LONG",
+      "expected": {
+        "skewness_extreme": true,
+        "status": "NEUTRO",
+        "reason_contains": "Skewness"
+      }
+    },
+    {
+      "name": "skewness_extrema_short",
+      "description": "Skewness > +2.0 para SHORT → NEUTRO (8.6 abort)",
+      "returns_type": "skewed_positive",
+      "bar": [1704067200000, 100.0, 102.0, 98.5, 101.0, 100.8, 101.2],
+      "direction": "SHORT",
+      "expected": {
+        "skewness_extreme": true,
+        "status": "NEUTRO",
+        "reason_contains": "Skewness"
+      }
+    },
+    {
+      "name": "high_equals_low",
+      "description": "High=Low → NEUTRO (edge case)",
+      "returns_type": "mean_reverting",
+      "bar": [1704067200000, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0],
+      "direction": "LONG",
+      "expected": {
+        "high_equals_low": true,
+        "status": "NEUTRO",
+        "reason_contains": "High equals Low"
+      }
+    },
+    {
+      "name": "full_confirmation_long",
+      "description": "Todos os passos de confirmação passam para LONG",
+      "returns_type": "full_confirmation",
+      "bar": [1704067200000, 100.0, 102.0, 98.5, 101.5, 101.2, 101.8],
+      "direction": "LONG",
+      "expected": {
+        "status": "PASS",
+        "filters": ["8.2_lb", "8.3_clv", "8.4_rb", "8.5_shadow"]
+      }
+    },
+    {
+      "name": "full_confirmation_short",
+      "description": "Todos os passos de confirmação passam para SHORT",
+      "returns_type": "full_confirmation_short",
+      "bar": [1704067200000, 102.0, 103.0, 100.0, 100.5, 100.3, 101.0],
+      "direction": "SHORT",
+      "expected": {
+        "status": "PASS",
+        "filters": ["8.2_lb", "8.3_clv", "8.4_rb", "8.5_shadow"]
+      }
+    }
+  ]
+}

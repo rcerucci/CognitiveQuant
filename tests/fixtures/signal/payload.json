@@ -1,0 +1,135 @@
+{
+  "test_cases": [
+    {
+      "name": "payload_alta",
+      "description": "Payload com sinal ALTA",
+      "direcao": "LONG",
+      "forca": 0.85,
+      "confianca": "ALTA",
+      "instrumento": "PETR4",
+      "z_score": -1.5,
+      "percentil_z": 0.92,
+      "hurst": 0.35,
+      "tau": 25.5,
+      "mu": 0.001,
+      "theta": 0.3,
+      "garch_sigma": 0.015,
+      "omega": 0.0001,
+      "alpha": 0.08,
+      "beta": 0.88,
+      "cv_theta": 0.25,
+      "expected": {
+        "versao_protocolo": "F5.0",
+        "origem": "motor",
+        "timeframe": "M30",
+        "sinal_direcao": "LONG",
+        "sinal_forca": 0.85,
+        "sinal_confianca": "ALTA",
+        "meia_vida_barras": 25.5,
+        "meia_vida_minutos": 765,
+        "validade_ate_present": true
+      }
+    },
+    {
+      "name": "payload_media",
+      "description": "Payload com sinal MÉDIA",
+      "direcao": "SHORT",
+      "forca": 0.68,
+      "confianca": "MÉDIA",
+      "instrumento": "BBDC4",
+      "z_score": 1.2,
+      "percentil_z": 0.75,
+      "hurst": 0.55,
+      "tau": 18.0,
+      "mu": -0.0005,
+      "theta": 0.4,
+      "garch_sigma": 0.012,
+      "omega": 0.00015,
+      "alpha": 0.1,
+      "beta": 0.85,
+      "cv_theta": 0.15,
+      "expected": {
+        "versao_protocolo": "F5.0",
+        "sinal_direcao": "SHORT",
+        "sinal_forca": 0.68,
+        "sinal_confianca": "MÉDIA",
+        "meia_vida_barras": 18.0,
+        "meia_vida_minutos": 540
+      }
+    },
+    {
+      "name": "payload_neutro",
+      "description": "Payload com sinal NEUTRO (8.6 ou falha)",
+      "direcao": "NEUTRO",
+      "forca": 0.0,
+      "confianca": "NEUTRO",
+      "instrumento": "PETR4",
+      "z_score": null,
+      "percentil_z": null,
+      "hurst": null,
+      "tau": null,
+      "mu": null,
+      "theta": null,
+      "garch_sigma": null,
+      "omega": null,
+      "alpha": null,
+      "beta": null,
+      "cv_theta": null,
+      "expected": {
+        "versao_protocolo": "F5.0",
+        "sinal_direcao": "NEUTRO",
+        "sinal_confianca": "NEUTRO",
+        "meia_vida_barras": null,
+        "meia_vida_minutos": null,
+        "validade_ate_present": false
+      }
+    },
+    {
+      "name": "payload_meia_vida_calculation",
+      "description": "meia_vida_minutos = tau × 30",
+      "direcao": "LONG",
+      "forca": 0.70,
+      "confianca": "MÉDIA",
+      "instrumento": "TEST",
+      "tau": 10.0,
+      "expected": {
+        "meia_vida_barras": 10.0,
+        "meia_vida_minutos": 300.0
+      }
+    },
+    {
+      "name": "payload_validade_ate",
+      "description": "validade_ate coerente com meia_vida",
+      "meia_vida_minutos": 100,
+      "expected": {
+        "validade_ate_present": true
+      }
+    },
+    {
+      "name": "payload_required_keys",
+      "description": "Payload tem todas as chaves obrigatórias",
+      "direcao": "LONG",
+      "forca": 0.80,
+      "confianca": "ALTA",
+      "instrumento": "TEST",
+      "expected": {
+        "has_versao_protocolo": true,
+        "has_timestamp_geracao": true,
+        "has_origem": true,
+        "has_instrumento": true,
+        "has_sinal_quantitativo": true,
+        "has_estatisticas_modelo": true,
+        "has_filtros_passados": true,
+        "has_candle_contexto": true,
+        "has_evidencias": true,
+        "has_riscos_estatisticos": true,
+        "has_calibracao_adaptativa": true,
+        "sinal_has_direcao": true,
+        "sinal_has_forca": true,
+        "sinal_has_confianca": true,
+        "sinal_has_meia_vida_minutos": true,
+        "sinal_has_validade_ate": true
+      }
+    }
+  ]
+}

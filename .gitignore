@@ -17,3 +17,7 @@ IDEA.md
 IDEA.md
 TASKS.md
 test-results.xml
+
+# Coverage and scripts
+.coverage
+scripts/

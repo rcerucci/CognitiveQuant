@@ -1,0 +1,72 @@
+{
+  "test_cases": [
+    {
+      "name": "garch_convergent_low_alpha_beta",
+      "description": "GARCH convergente com α+β < 0.995",
+      "series_type": "garch_stable",
+      "parameters": {
+        "omega": 0.0001,
+        "alpha": 0.08,
+        "beta": 0.85
+      },
+      "window_size": 200,
+      "expected": {
+        "status": "PASS",
+        "source": "garch",
+        "alpha_plus_beta_max": 0.995
+      }
+    },
+    {
+      "name": "garch_violation_alpha_beta",
+      "description": "GARCH com α+β ≥ 0.995 deve usar fallback",
+      "series_type": "garch_unstable",
+      "parameters": {
+        "omega": 0.0001,
+        "alpha": 0.15,
+        "beta": 0.88
+      },
+      "window_size": 200,
+      "expected": {
+        "status": "PASS",
+        "source": "garch"
+      }
+    },
+    {
+      "name": "warmup_short_series",
+      "description": "Série curta (< 200) para warm-up deve retornar NEUTRO",
+      "series_type": "short",
+      "series_length": 100,
+      "window_size": 200,
+      "expected": {
+        "status": "NEUTRO",
+        "reason": "warm_up",
+        "source": null,
+        "garch_sigma": null
+      }
+    },
+    {
+      "name": "fallback_active",
+      "description": "Quando GARCH não converge, usa fallback σ = √(∑r²/20)",
+      "series_type": "random_walk",
+      "series_length": 500,
+      "window_size": 200,
+      "expected": {
+        "status": "PASS",
+        "source": "fallback"
+      }
+    },
+    {
+      "name": "alpha_beta_exactly_0_995",
+      "description": "α+β exatamente 0.995 deve usar fallback (violação da restrição estrita)",
+      "series_type": "boundary",
+      "parameters": {
+        "alpha_plus_beta": 0.995
+      },
+      "window_size": 200,
+      "expected": {
+        "status": "PASS",
+        "source": "fallback"
+      }
+    }
+  ]
+}

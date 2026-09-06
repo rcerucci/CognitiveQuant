@@ -1,0 +1,62 @@
+{
+  "test_cases": [
+    {
+      "name": "f3_pass_garch_success",
+      "description": "F3 PASS + GARCH ok → F4 PASS com todos os campos",
+      "f3_status": "PASS",
+      "mu_t": 0.001,
+      "X_t": 0.005,
+      "r_t": 0.004,
+      "returns_history_type": "garch_stable",
+      "z_history_size": 200,
+      "expected": {
+        "status": "PASS",
+        "garch_sigma_not_null": true,
+        "z_t_not_null": true,
+        "percentil_z_range": [0, 1],
+        "source": "garch"
+      }
+    },
+    {
+      "name": "f3_neutro_no_promote",
+      "description": "F3 NEUTRO → F4 não promove PASS",
+      "f3_status": "NEUTRO",
+      "mu_t": null,
+      "X_t": 0.005,
+      "r_t": 0.004,
+      "returns_history_type": "garch_stable",
+      "expected": {
+        "status": "NEUTRO",
+        "reason": "F3 did not pass"
+      }
+    },
+    {
+      "name": "fallback_with_sigma_valid",
+      "description": "Fallback ativado mas σ>0 → ainda pode PASS",
+      "f3_status": "PASS",
+      "mu_t": 0.001,
+      "X_t": 0.005,
+      "r_t": 0.004,
+      "returns_history_type": "random_walk",
+      "z_history_size": 200,
+      "expected": {
+        "status": "PASS",
+        "garch_sigma_not_null": true,
+        "source": "fallback"
+      }
+    },
+    {
+      "name": "warmup_short_history",
+      "description": "Histórico < 200 retornos → NEUTRO",
+      "f3_status": "PASS",
+      "mu_t": 0.001,
+      "X_t": 0.005,
+      "r_t": 0.004,
+      "returns_history_type": "short",
+      "returns_history_size": 100,
+      "expected": {
+        "status": "NEUTRO"
+      }
+    }
+  ]
+}
