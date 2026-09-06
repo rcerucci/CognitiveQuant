@@ -36,6 +36,9 @@ dev = [
     "jsonschema>=4.20.0",
 ]
 
+[project.scripts]
+f6-backtest = "motor.backtest.cli:main"
+
 [project.urls]
 Repository = "https://github.com/cognitivequant/cognitivequant"
 

@@ -20,4 +20,13 @@ test-results.xml
 
 # Coverage and scripts
 .coverage
-scripts/
+
+# Dataset e relatório do experimento offline (não versionar)
+data/ohlc/*
+!data/ohlc/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# Scripts - versionar fetch scripts
+!scripts/fetch_ohlc.py
+!scripts/fetch_ohlc_quantconnect.py
