@@ -32,6 +32,7 @@ from motor.regime.pipeline import (
     F3Pipeline,
     F3PipelineResult,
     F3Status,
+    K_HALF_LIFE_BARS,
 )
 
 __all__ = [
@@ -49,4 +50,5 @@ __all__ = [
     "F3Pipeline",
     "F3PipelineResult",
     "F3Status",
+    "K_HALF_LIFE_BARS",
 ]
