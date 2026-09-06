@@ -55,3 +55,14 @@
 - [ ] T025 Exportar API pública de backtest em `src/motor/backtest/__init__.py`
 - [ ] T026 [P] Reexportar `backtest` em `src/motor/__init__.py`
 - [ ] T027 Verificar SC da spec F6 (loader, runner, PnL, métricas, gate 7/10, escopo sem TA/MCP/provider) via suite em `tests/unit/test_backtest_*.py`
+
+## Phase 9: US6 — Run offline + gate §10.1 (hotfix)
+
+- [ ] T028 [US6] Implementar checklist dos 10 arquivos canônicos em `data/ohlc/` (`eur_usd`, `gbp_jpy`, `usd_cad`, `aud_nzd`, `us500`, `ger30`, `jp225`, `xau_usd`, `usoil`, `nas100` + `.parquet`) em `src/motor/backtest/loader.py`
+- [ ] T029 [P] [US6] Atualizar `.gitignore` para não versionar dataset em `data/ohlc/` nem `reports/`, e liberar `scripts/`
+- [ ] T030 [US6] Expor CLI `f6-backtest --data-dir data/ohlc --out reports/f6_backtest.json` via entrada em `pyproject.toml` (apontando o pipeline)
+- [ ] T031 [US6] Emitir artefato `reports/f6_backtest.json` (Sharpe, WR, PF, MaxDD, trigger rate, mediana τ, taxa só-ALTA, por par + ano, gate 7/10) em `src/motor/backtest/report.py`
+- [ ] T032 [US6] Falhar o run (FAIL) se `data/ohlc/` vazia ou instrumentos INSUFICIENTE demais para o gate em `src/motor/backtest/pipeline.py`
+- [ ] T033 [US6] Escrever Independent Test US6 (pasta vazia / INSUFICIENTE → FAIL; sem exigir dataset 5 anos no git) em `tests/unit/test_backtest_offline_run.py`
+- [ ] T034 [US6] Criar `scripts/fetch_ohlc_quantconnect.py` (fora de `src/motor/`; implementação do fetch **só após** Marcos confirmar QuantConnect — cópia manual dos 10 `.parquet` já desbloqueia o run)
+
