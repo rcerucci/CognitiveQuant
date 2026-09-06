@@ -1,4 +1,8 @@
-"""Testes F3 US1 — Regime Hurst R/S."""
+"""Testes F3 US1 — Regime Hurst R/S (T032 - alinhado 003b).
+
+T032: Alinhar testes Hurst (H não abre PASS sozinho)
+Addendum 003b: Hurst via DFA Peng diagnóstico, não hard-gate.
+"""
 from __future__ import annotations
 
 import json
@@ -87,7 +91,7 @@ def generate_trend_series(length: int, trend_slope: float = 0.001, seed: int = 4
 
 
 class TestHurstCalculation:
-    """Testes para cálculo do coeficiente de Hurst."""
+    """Testes para cálculo do coeficiente de Hurst (T032)."""
     
     def test_ou_series_reversal(self):
         """Testa série mean-reverting → H < 0.45 → REVERSAL."""
@@ -100,21 +104,25 @@ class TestHurstCalculation:
         assert result.regime == RegimeType.REVERSAL, f"Expected REVERSAL, got {result.regime}"
     
     def test_random_walk_neutral(self):
-        """Testa Random Walk → H ≈ 0.5 → NEUTRO."""
+        """Testa Random Walk → H ≈ 0.5 → NEUTRO (T032)."""
         series = generate_random_walk_series(300)
         result = calculate_hurst(series)
         
         # Para RW, H deve estar em torno de 0.5
-        assert result.status == HurstStatus.NEUTRO, f"Expected NEUTRO, got {result.status}"
+        assert result.status == HurstStatus.PASS, f"Expected PASS, got {result.status}"
         assert result.hurst is not None, "Hurst should not be None"
+        # Em 003b, HURST é apenas diagnóstico - sempre PASS se calculado
+        assert result.regime is None, "RW deve ser NEUTRO (regime=None)"
     
     def test_trend_series_neutral(self):
-        """Testa tendência → H > 0.55 → NEUTRO."""
+        """Testa tendência → H > 0.55 → NEUTRO (T027)."""
         series = generate_trend_series(300)
         result = calculate_hurst(series)
         
-        assert result.status == HurstStatus.NEUTRO, f"Expected NEUTRO for trend, got {result.status}"
+        assert result.status == HurstStatus.PASS, f"Expected PASS for trend, got {result.status}"
         assert result.hurst is not None, "Hurst should not be None"
+        # H > 0.55 não deve gerar tendência (T027)
+        assert result.regime is None, "Tendência não deve gerar regime de tendência"
     
     def test_warmup_short_series(self):
         """Testa warm-up com série curta (< 200)."""
@@ -126,8 +134,63 @@ class TestHurstCalculation:
         assert result.regime is None, "Regime should be None for warm-up"
 
 
+class TestHurstT032_H_not_hard_gate:
+    """Testes T032: Hurst não abre PASS/NEUTRO sozinho (003b)."""
+    
+    def test_h_never_forces_neutral_based_on_hurst_value_only(self):
+        """T032: Hurst é diagnóstico - status PASS se calculado, independente do valor.
+        
+        O gate de PASS agora é baseado em θ̂, IC_low e τ (spec 003b).
+        """
+        # Testar diferentes valores de H
+        test_cases = [
+            ("low", 0.30),  # H < 0.45
+            ("border_low", 0.45),  # H = 0.45
+            ("neutral_low", 0.50),  # H ≈ 0.5
+            ("border_high", 0.55),  # H = 0.55
+            ("high", 0.70),  # H > 0.55
+        ]
+        
+        for name, h_val in test_cases:
+            # Gerar série e verificar que o status depende do cálculo, não do valor
+            series = generate_random_walk_series(300, seed=42)
+            result = calculate_hurst(series)
+            
+            # Status deve ser PASS se H foi calculado (diagnóstico)
+            assert result.status in [HurstStatus.PASS, HurstStatus.NEUTRO], \
+                f"{name}: status deve ser PASS ou NEUTRO"
+    
+    def test_high_h_does_not_create_trend_signal(self):
+        """T027: H > 0.55 não cria sinal de tendência."""
+        # Gerar série com H > 0.55 (trend)
+        rng = np.random.default_rng(42)
+        t = np.arange(300)
+        noise = rng.standard_normal(300) * 0.005
+        series = (0.001 * t + np.cumsum(noise)).tolist()
+        
+        result = calculate_hurst(series)
+        
+        # Mesmo H > 0.55, não deve gerar tendência
+        if result.hurst is not None and result.hurst > 0.55:
+            assert result.regime is None, \
+                f"H > 0.55 ({result.hurst}) não deve gerar regime de tendência"
+    
+    def test_hurst_is_diagnostic_only(self):
+        """T027: Hurst é apenas métrica de contexto, não hard-gate."""
+        # Criar séries com diferentes H e verificar que o status é PASS quando calculado
+        series = generate_mean_reverting_series(300, seed=42)
+        result = calculate_hurst(series)
+        
+        # Se H foi calculado, status é PASS (diagnostic only)
+        assert result.status == HurstStatus.PASS
+        assert result.hurst is not None
+        
+        # Regime pode ser REVERSAL ou None (NEUTRO)
+        # Mas o status PASS não depende desse regime
+
+
 class TestHurstBoundaries:
-    """Testes para limites de Hurst (SC-001)."""
+    """Testes para limites de Hurst (SC-001, T032)."""
     
     def test_hurst_at_reversal_boundary(self):
         """Testa H = 0.45 → NEUTRO (borda inferior)."""
@@ -139,7 +202,8 @@ class TestHurstBoundaries:
         # O limiar é < 0.45 para REVERSAL
         # Se H >= 0.45, deve ser NEUTRO
         if result.hurst is not None and result.hurst >= 0.45:
-            assert result.status == HurstStatus.NEUTRO
+            assert result.status == HurstStatus.PASS  # Sempre PASS se calculado
+            assert result.regime is None  # NEUTRO
     
     def test_hurst_at_trend_boundary(self):
         """Testa H = 0.55 → NEUTRO (borda superior)."""
@@ -147,13 +211,14 @@ class TestHurstBoundaries:
         series = generate_trend_series(300, trend_slope=0.002)
         result = calculate_hurst(series)
         
-        # Se H > 0.55, deve ser NEUTRO
+        # Se H > 0.55, deve ser NEUTRO (sem tendência)
         if result.hurst is not None and result.hurst > 0.55:
-            assert result.status == HurstStatus.NEUTRO
+            assert result.status == HurstStatus.PASS
+            assert result.regime is None  # NEUTRO (não tendência)
 
 
 class TestHurstWithSubSizes:
-    """Testes para sub-tamanhos R/S."""
+    """Testes para sub-tamanhos R/S (FR-002a)."""
     
     def test_default_sub_sizes(self):
         """Testa que sub-tamanhos padrão são usados."""

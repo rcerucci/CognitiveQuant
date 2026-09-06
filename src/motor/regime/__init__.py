@@ -4,9 +4,15 @@ Módulo responsável por:
 - Calcular Hurst (R/S) para classificar regime
 - Estimar processo OU via Kalman com fallback MLE
 - Bootstrap IID para medir estabilidade de θ
+- Pipeline completo com gate θ̂>0 ∧ IC_low>0 ∧ τ≤K (003b)
+
+T027-T033 (hotfix 003b): Gate de regime baseado em OU/τ em vez de Hurst
 """
 
 __version__ = "0.1.0"
+
+# Constante K = 20 barras M30 (lock Marcos 003b)
+K_HALF_LIFE_BARS = 20
 
 from motor.regime.hurst import (
     calculate_hurst,
@@ -32,21 +38,29 @@ from motor.regime.pipeline import (
     F3Pipeline,
     F3PipelineResult,
     F3Status,
+    K_HALF_LIFE_BARS as PIPELINE_K_HALF_LIFE_BARS,
 )
 
 __all__ = [
+    # Constantes
+    "K_HALF_LIFE_BARS",
+    # Hurst
     "calculate_hurst",
     "HurstResult",
     "HurstStatus",
     "RegimeType",
+    # OU
     "estimate_ou_kalman",
     "estimate_ou_mle",
     "OUEstimationResult",
     "OUStatus",
+    # Bootstrap
     "bootstrap_theta",
     "BootstrapResult",
     "BootstrapStatus",
+    # Pipeline
     "F3Pipeline",
     "F3PipelineResult",
     "F3Status",
+    "PIPELINE_K_HALF_LIFE_BARS",
 ]
