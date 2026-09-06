@@ -62,4 +62,9 @@
 | SC-004 | ✅ Sem GARCH/Z/payload/TA/executor/CUSUM |
 | B001 Corrigido | ✅ Enums status exportados |
 
-**PR Status: APROVADO**
+**PR Status: APROVADO**## Phase hotfix: US1 — Hurst DFA (addendum)
+
+- [ ] T023 [US1] Implementar Hurst DFA em `X_t` (escalas `{8,16,32,64}`; ≥2 segmentos; H=α log-log F(s)~s; proibido 1 segmento) em `src/motor/regime/hurst.py`
+- [ ] T024 [US1] Implementar fallback R/S (uma estatística por escala, sem n com 1 bloco) se DFA falhar aceite B em `src/motor/regime/hurst.py`
+- [ ] T025 [US1] Escrever teste A/B/C seed=42 (branco / OU H<0.45 / RW H>0.55; R/S atual falha B) em `tests/unit/test_hurst_sanity.py`
+- [ ] T026 [US1] Alinhar Independent Test US1 existente aos cortes DFA em `tests/unit/test_regime_hurst.py`
