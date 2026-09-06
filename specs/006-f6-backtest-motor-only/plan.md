@@ -1,168 +1,184 @@
 # Implementation Plan: F6 — Backtest motor-only
 
-**Branch**: `006-f6-backtest-motor-only` | **Date**: 2026-09-05 | **Spec**: `specs/006-f6-backtest-motor-only/spec.md`
+**Branch**: `feature/006-f6-backtest-motor-only` (hotfix US6) | **Date**: 2026-09-06 | **Spec**: `specs/006-f6-backtest-motor-only/spec.md`
 
-**Input**: Feature specification from `/specs/006-f6-backtest-motor-only/spec.md`
+**Input**: Feature specification + **Addendum US6** (hotfix aceite §10.1)
 
-**Locks (Marcos)**: fonte = **CSV/parquet real** (provider = adapter **fora**) · PnL **(a)** entry mid-close · exit `validade_ate`/τ · **sem flip** · trigger = **ALTA|MÉDIA** (força ≥ 0.60) · só-ALTA = diagnóstico F7 · Sharpe = equity **diária**, Rf=0, **×√252** · gate **≥7/10** com Sharpe **> 0.5** · `seed=42` se houver aleatoriedade
+**Locks (Marcos)**: fonte = **CSV/parquet real** sob `data/ohlc/` · PnL **(a)** mid-close → `validade_ate`/τ · **sem flip** · trigger = **ALTA|MÉDIA** (≥ 0.60) · só-ALTA = diagnóstico · Sharpe = equity **diária**, Rf=0, **×√252** · gate **≥7/10** Sharpe **> 0.5** · `seed=42` · **aceite §10.1 = run offline US6 + artefato** (CI fixture ≠ fechamento)
 
-**Depende de**: F5 em `main` (`415a7bf`) — `src/motor/{ohlc,filters,regime,vol,signal}/` (pipeline F1→F5)
+**Depende de**: aparelho F6 (T001–T027) em `src/motor/backtest/` + F5 em `main` — **não** reabrir F5 · **não** iniciar F7 até existir `reports/f6_backtest.json`
+
+**NC aberto (Spec)**: Marcos **confirma o provider** abaixo **antes** do coder implementar o fetch em `scripts/`.
+
+---
 
 ## Summary
 
-Implementar backtest histórico **motor-only** (§10.1): carregar OHLC M30 real (CSV/parquet) dos **10** instrumentos §9.2, rodar F1→F5 barra a barra sem TA/MCP, simular trades (entry mid-close → exit τ/`validade_ate`, sem flip), métricas §10.1 + Sharpe diário ×√252, gate 7/10, relatório in-memory. Não reabre F5.
+Fechar o buraco §10.1: além do aparelho (US1–US5), executar o **experimento offline** (US6) em `data/ohlc/` (10 × §9.2), gravar `reports/f6_backtest.json` (métricas + por ano + gate 7/10 + só-ALTA), FAIL se pasta vazia/INSUFICIENTE. Dataset **fora** do git; run **não** é CI; fetch **fora** de `src/motor/`.
 
 ## Technical Context
 
-**Language/Version**: Python ≥3.11 (Camada 1 — consolidado §2.3; stack F1–F5 / `pyproject.toml` em `main`)
+**Language/Version**: Python ≥3.11 (stack F6 já em branch: pandas, pyarrow, …)
 
-**Primary Dependencies (F6)**:
-- **Novas**: `pandas` (+ `pyarrow` se parquet) — leitura CSV/parquet materializado (`pyproject.toml` hoje: `statsmodels`, `pykalman`, `numpy`, `scipy`, `arch` — **sem** pandas)
-- Consumo: APIs públicas F1–F5 (`run_f5_pipeline` / `F5Pipeline`, ohlc/filters/regime/vol) — **sem** reimplementar
-- **Sem** SDKs Polygon/OANDA/QC/Broker; **sem** TradingAgents/MCP
+**Primary Dependencies (hotfix US6)**:
+- Reuso: `motor.backtest.{loader,runner,pnl,metrics,report,pipeline}`
+- **Sem** SDK de provider em `src/motor/`
+- Fetch (após confirmação Marcos): deps do provider **só** em `scripts/` / optional-deps `fetch` — **não** no runtime do motor
 
-**Storage**: arquivos **já materializados** em `data/ohlc/` (runtime; **não existe em `main` hoje** — Setup F6 cria o path) + fixtures em `tests/fixtures/backtest/`. Sem download de provider no runner/CI. Dataset 5 anos pode ficar fora do git (gitignore/local); CI usa fixtures pequenas.
+**Storage**:
+- Input: `data/ohlc/{canonical}.parquet` (preferência) ou `.csv`
+- Output: `reports/f6_backtest.json`
+- Ambos **gitignore** (exceto `data/ohlc/.gitkeep`); dataset 5 anos **não** entra no git
 
-**Testing**: `pytest` + fixtures CSV/parquet **pequenas** (sem rede). Gate 7/10 com dataset 5 anos = execução offline com dados reais (não inventar preços sintéticos como substituto do gate).
+**Testing**:
+- CI: FAIL explícito se `data/ohlc/` vazio; schema do artefato com fixture mínima — **sem** 5 anos no CI
+- Aceite §10.1: run local offline com dataset real → artefato + gate factual
 
-**Target Platform**: Host do motor (library / CLI leve opcional).
+**Constraints (US6)**:
+- Run **não** é job CI obrigatório com 5 anos
+- Equity diária = **último equity do dia UTC** (agregação M30→diário; sem mudar limiares)
+- Instrumento INSUFICIENTE (série curta / só warm-up) → **não** conta Sharpe > 0.5; run FAIL se incompleto demais para o gate
+- F7 bloqueada até artefato US6 existir
 
-**Project Type**: library — Option 1 Spec Kit; subpacote `src/motor/backtest/`.
+---
 
-**Constraints**:
-- Universo §9.2 (exato): EUR/USD, GBP/JPY, USD/CAD, AUD/NZD, US500, GER30, JP225, XAU/USD, USOIL, NAS100
-- Horizonte doc: **5 anos** M30
-- Trigger F6: `direcao` ∈ {LONG, SHORT} e `confianca` ∈ {ALTA, MÉDIA} (força ≥ 0.60)
-- Entry = mid `(bid+ask)/2` no close da barra do sinal; exit = mid-close na barra de `validade_ate` / `meia_vida_barras`; sem flip
-- Custo Zero §10.1 — sem inventar spread/comissão além do mid
-- Sharpe: retornos de **equity diária**, Rf=0, ×√252
-- Alvos reportados: Sharpe > 0.5; WR > 45%; PF > 1.3; MaxDD < 15%; taxa triggers 5–15%; mediana τ 3–8 barras
-- Gate: `count(Sharpe > 0.5) ≥ 7` → PASS global
-- Truncamento: exit além do fim da série → última barra + log
-- Zero triggers → não inventar Sharpe; instrumento falha gate
+## Provider proposto (NC — Marcos confirma antes do fetch)
 
-**Scale/Scope**: US1–US5 da spec F6.
+**Proposta única: QuantConnect** (histórico multi-asset → materializa parquet local).
 
-## Constitution Check
+| Motivo | Detalhe |
+|--------|---------|
+| Cobertura | FX + índices/commodities do §9.2 num único pipeline de dados |
+| Isolamento | SDK/API **somente** em `scripts/`; loader F6 continua **só** arquivo local |
+| Alternativa (se Marcos rejeitar QC) | **OANDA** — forte em FX/XAU; confirmar cobertura de US500/GER30/JP225/USOIL/NAS100 na conta dele |
 
-- Só motor puro; zero TA/executor/MCP.
-- Não reabre F5 / não muda limiares de sinal.
-- Provider adapter fora (não acoplar API no runner).
+**Até Marcos confirmar:** coder **não** implementa fetch; cópia manual dos 10 arquivos canônicos em `data/ohlc/` é suficiente para o run.
 
-**Gate**: PASS com F5 `signal/` em `main`.
+---
 
-## Árvore real (`origin/main` pós-F5) vs o que F6 adiciona
+## Nomes canônicos dos 10 arquivos (`data/ohlc/`)
 
-**Já existe** (não recriar):
+Regra = loader já em branch: `instrumento.replace("/", "_").lower()` + extensão.
+
+| §9.2 | Arquivo canônico (preferir parquet) |
+|------|-------------------------------------|
+| EUR/USD | `eur_usd.parquet` |
+| GBP/JPY | `gbp_jpy.parquet` |
+| USD/CAD | `usd_cad.parquet` |
+| AUD/NZD | `aud_nzd.parquet` |
+| US500 | `us500.parquet` |
+| GER30 | `ger30.parquet` |
+| JP225 | `jp225.parquet` |
+| XAU/USD | `xau_usd.parquet` |
+| USOIL | `usoil.parquet` |
+| NAS100 | `nas100.parquet` |
+
+CSV aceito com o mesmo stem (`.csv`) se parquet ausente — comportamento atual do loader.
+
+Formato barras: F1 (`timestamp`, `open`, `high`, `low`, `close`, `bid`, `ask`); timeframe **M30**; horizonte alvo **~5 anos**.
+
+---
+
+## Árvore real (branch feature/006) vs hotfix US6
+
+**Já existe** (não recriar aparelho):
 
 ```text
-pyproject.toml
-src/motor/__init__.py
-src/motor/ohlc/          # F1
-src/motor/filters/       # F2
-src/motor/regime/        # F3
-src/motor/vol/           # F4
-src/motor/signal/        # F5
-tests/unit/test_{ohlc,filter,regime,vol,signal}_*.py
-tests/fixtures/{ohlc,filters,regime,vol,signal}/
-specs/001-…/ … /005-…/
-```
-
-**Não existe em `main`**: `data/`, `src/motor/backtest/`, `tests/fixtures/backtest/`, deps `pandas`/`pyarrow`.
-
-**F6 adiciona**:
-
-```text
-src/motor/backtest/
-  __init__.py
-  loader.py          # US2 — CSV/parquet → barras F1; universo §9.2
-  runner.py          # US1 — barra-a-barra F1→F5
-  pnl.py             # US3 — entry/exit/sem flip
-  metrics.py         # US4 — Sharpe/WR/PF/MaxDD/trigger_rate/mediana τ
-  report.py          # US5 — gate 7/10 + relatório in-memory
-  pipeline.py        # orquestra loader→runner→pnl→metrics→report
-
-data/ohlc/                 # path Setup (materializado; provider fora)
-  # 10 arquivos §9.2 (csv|parquet); nomes canônicos a fixar no loader
-
-tests/unit/
-  test_backtest_loader.py
-  test_backtest_runner.py
-  test_backtest_pnl.py
-  test_backtest_metrics.py
-  test_backtest_report.py
-  test_backtest_pipeline.py
-
+src/motor/backtest/{__init__,loader,runner,pnl,metrics,report,pipeline}.py
+data/ohlc/.gitkeep
+tests/unit/test_backtest_*.py
 tests/fixtures/backtest/
-  sample_bars.csv / .parquet
-  equity_trades.json
-  sharpe_table.json
-
-specs/006-f6-backtest-motor-only/
-  plan.md / spec.md / tasks.md
+specs/006-f6-backtest-motor-only/{spec,plan,tasks}.md
 ```
 
-**Deps**: acrescentar `pandas` (+ `pyarrow` se parquet) em `pyproject.toml`. Sem SDKs de broker/Polygon/OANDA/QC.
-
-## Project Structure
-
-### Documentation (this feature)
+**Hotfix US6 adiciona**:
 
 ```text
-specs/006-f6-backtest-motor-only/
-├── plan.md              # este arquivo
-├── spec.md              # Spec (aprovada)
-└── tasks.md             # Tasks (próximo — NÃO gerado aqui)
+src/motor/backtest/cli.py     # entrypoint run offline → data/ohlc/ → reports/
+reports/.gitkeep             # path do artefato (conteúdo gitignored)
+reports/f6_backtest.json     # artefato local (NÃO no git)
+
+scripts/fetch_ohlc.py        # SÓ após Marcos confirmar provider
+                             # (ou cópia manual — skip fetch)
+
+.gitignore                   # ver bloco abaixo
+pyproject.toml               # console script `f6-backtest` → cli
+
+tests/unit/test_backtest_cli.py          # FAIL pasta vazia / schema artefato
+tests/fixtures/backtest/run_empty/      # harness incompleto (opcional)
 ```
 
-**Structure Decision**: `src/motor/backtest/` ao lado das camadas F1–F5 — validação §10.1 sem misturar TA (F7) nem executor (F8).
+### `.gitignore` (DIVERGÊNCIA a corrigir)
 
-## O que esta fatia MEXE
+Hoje `scripts/` está **inteiro** no `.gitignore` de `main` — conflita com Spec (fetch versionado em `scripts/`). Hotfix:
+
+```gitignore
+# Dataset e relatório do experimento (não versionar)
+data/ohlc/*
+!data/ohlc/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# Scripts: versionar fetch; não ignorar a pasta inteira
+# (remover a linha `scripts/` do ignore atual)
+```
+
+---
+
+## CLI / comando (amarrado)
+
+```text
+f6-backtest --data-dir data/ohlc --out reports/f6_backtest.json
+```
+
+Equiv. módulo: `python -m motor.backtest.cli --data-dir data/ohlc --out reports/f6_backtest.json`
+
+- Exit **≠ 0** se: pasta vazia / só `.gitkeep` / faltam canônicos / INSUFICIENTE demais para avaliar gate
+- Exit **0** com artefato gravado quando os 10 arquivos existem e o pipeline corre (veredito gate PASS|FAIL **factual** no JSON — FAIL de gate ≠ crash se dados ok)
+
+## Artefato `reports/f6_backtest.json` (schema mínimo)
+
+- `gate`: `{ pass_count, threshold: 0.5, min_instruments: 7, veredito: PASS|FAIL }`
+- `instruments[]`: símbolo, Sharpe, WR, PF, MaxDD, trigger_rate, tau_median, alta_only_rate (diagnóstico), status (OK|INSUFICIENTE), `by_year[]` quando couber
+- `meta`: data_dir, seed=42, timeframe=M30, gerado_em
+
+## O que esta fatia / hotfix MEXE
 
 | Área | Paths |
 |------|--------|
-| Spec package | `specs/006-f6-backtest-motor-only/` |
-| Backtest | `src/motor/backtest/{loader,runner,pnl,metrics,report,pipeline}.py` |
-| Dados | `data/ohlc/` (Setup novo) + `tests/fixtures/backtest/` |
-| Deps | `pyproject.toml` (+ pandas/pyarrow) |
-| Testes | `tests/unit/test_backtest_*.py` |
-| Export | `src/motor/backtest/__init__.py` (+ reexport opcional em `src/motor/__init__.py`) |
+| Spec package | `specs/006-f6-backtest-motor-only/` (spec US6 + este plan + tasks T028+) |
+| CLI | `src/motor/backtest/cli.py` + entry em `pyproject.toml` |
+| Reports | `reports/.gitkeep` (+ artefato local) |
+| Fetch (pós-confirmação) | `scripts/fetch_ohlc.py` |
+| Ignore | `.gitignore` (data/ohlc content, reports, liberar `scripts/`) |
+| Testes US6 | `tests/unit/test_backtest_cli.py` |
 
-## O que esta fatia NÃO MEXE
+## O que NÃO MEXE
 
-- `src/motor/{ohlc,filters,regime,vol,signal}/**` (exceto **consumir**)
-- Adapter Polygon/OANDA/QC/Broker — **fora**
-- TradingAgents — **F7**
-- Executor / paper / MCP — **F8**
-- FTMO challenge / hard-stop — **F9**
-- UI, productizar, `volume`
-- Paths fora da árvore acima
+- `src/motor/{ohlc,filters,regime,vol,signal}/**` (F5 fechado)
+- Provider SDK dentro de `src/motor/`
+- TradingAgents / F7 / Executor F8 / FTMO F9
+- Reimplementar loader/runner/pnl/metrics/report (só consumir + CLI + persistência do relatório)
+- Exigir dataset 5 anos no git/CI
 
-## Dependências e ordem no pipeline do sistema
+## Ordem pipeline hotfix
 
 ```text
-[F1]→[F2]→[F3]→[F4]→[F5 signal]  ← em main
-        ↓
-[F6 backtest motor-only]  ← ESTA FATIA
-        ↓
-[F7 TA] → [F8 Executor] → [F9 FTMO]
+Setup ignore/reports → CLI → checklist 10 arquivos → persist report
+  → (Marcos confirma provider) → scripts/fetch_ohlc.py
+  → run offline local → artefato → Tasks T028+
 ```
 
-Dentro de F6: **Setup → loader → runner → pnl → metrics → report/pipeline → testes por US**.
+Dentro do Spec Kit: **não** começar F7 sem `reports/f6_backtest.json`.
 
-## Onde vive o teste
+## Onde vive o teste (US6)
 
-| US | Independent Test → arquivo |
-|----|----------------------------|
-| US1 | `tests/unit/test_backtest_runner.py` |
-| US2 | `tests/unit/test_backtest_loader.py` |
-| US3 | `tests/unit/test_backtest_pnl.py` |
-| US4 | `tests/unit/test_backtest_metrics.py` |
-| US5 | `tests/unit/test_backtest_report.py` (+ pipeline) |
-| Fixtures | `tests/fixtures/backtest/` |
-
-Runner: `pytest` na raiz.
+| Item | Path |
+|------|------|
+| Independent Test CI (FAIL vazio + schema) | `tests/unit/test_backtest_cli.py` |
+| Aceite offline §10.1 | run local + `reports/f6_backtest.json` (fora do CI) |
 
 ## Complexity Tracking
 
-N/A — pandas/pyarrow só para I/O de série (não estavam em `main`); locks Marcos fecham PnL/Sharpe/fonte; sem stack inventada fora do ecossistema Python do motor.
+- Provider QC proposto — **aguarda confirmação Marcos** (NC Spec).
+- `.gitignore` `scripts/` — correção obrigatória para versionar fetch sem inventar outra pasta.
