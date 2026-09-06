@@ -3,7 +3,7 @@
 Orquestra os filtros na ordem §5.1: Spread → ADF → TR → Vol Parkinson
 com short-circuit no primeiro filtro que falha.
 
-Spec: §3.3 / US5
+Spec: §3.3 / US5 / Addendum ADF r_t
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from motor.filters.spread import FilterSpread, FilterSpreadResult, FilterStatus 
 from motor.filters.adf import FilterADF, FilterADFResult, FilterStatus as ADFStatus
 from motor.filters.tr import FilterTR, FilterTRResult, FilterStatus as TRStatus
 from motor.filters.parkinson import FilterParkinson, FilterParkinsonResult, FilterStatus as ParkinsonStatus
-
 
 class PipelineStatus(str, Enum):
     """Status final do pipeline."""
@@ -70,12 +69,41 @@ class Pipeline:
                 return True
         return False
     
+    def _extract_returns(self) -> List[float]:
+        """Extrai a série de retornos r_t = X_t - X_{t-1}.
+        
+        X_t = ln(P_t) = ln((bid + ask) / 2)
+        r_t = X_t - X_{t-1}
+        
+        Returns:
+            Lista de retornos (r_t). Menor que 1 elemento se não houver retorno anterior.
+        """
+        import math
+        
+        X_t = []
+        for bar in self.bars:
+            # P_t = (Bid + Ask) / 2
+            P_t = (bar.bid + bar.ask) / 2.0
+            # X_t = ln(P_t)
+            X_t.append(math.log(P_t))
+        
+        # Calcular retornos: r_t = X_t - X_{t-1}
+        r_t = []
+        for i in range(len(X_t)):
+            if i == 0:
+                # Primeira barra não tem retorno anterior
+                r_t.append(None)
+            else:
+                r_t.append(X_t[i] - X_t[i-1])
+        
+        return r_t
+    
     def run(self) -> PipelineResult:
         """Executa o pipeline de filtros na ordem §5.1.
         
         Ordem:
         1. Spread (T008) → falha → NEUTRO
-        2. ADF (T011) → falha → NEUTRO
+        2. ADF (T011) → falha → NEUTRO (agora em r_t, não X_t)
         3. TR (T014) → falha → NEUTRO
         4. Parkinson (T017) → falha → NEUTRO temporário + log
         
@@ -108,17 +136,11 @@ class Pipeline:
                 metrics={"spread": spread_result.spread, "spread_ma20": spread_result.spread_ma20}
             )
         
-        # 2. Filtro ADF - precisa de X_t
-        # Extrair X_t das barras (log-price pré-calculado ou calcular)
-        X_t = []
-        for bar in self.bars:
-            # P_t = (Bid + Ask) / 2
-            P_t = (bar.bid + bar.ask) / 2.0
-            # X_t = ln(P_t)
-            import math
-            X_t.append(math.log(P_t))
+        # 2. Filtro ADF - Agora usando r_t (retornos) em vez de X_t
+        # Extrai a série de retornos r_t
+        r_t = self._extract_returns()
         
-        adf_result = FilterADF(X_t).run()
+        adf_result = FilterADF(r_t).run()
         if adf_result.status == "NEUTRO":  # string comparison para compatibilidade
             return PipelineResult(
                 status=PipelineStatus.NEUTRO,
