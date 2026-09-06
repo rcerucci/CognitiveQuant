@@ -1,0 +1,64 @@
+{
+  "test_cases": [
+    {
+      "name": "alta_threshold_exact",
+      "description": "Força exatamente 0.75 → ALTA (>=)",
+      "forca": 0.75,
+      "expected": "ALTA"
+    },
+    {
+      "name": "alta_threshold_above",
+      "description": "Força acima de 0.75 → ALTA",
+      "forca": 0.76,
+      "expected": "ALTA"
+    },
+    {
+      "name": "media_threshold_borde_74",
+      "description": "Força 0.74 → MÉDIA (< 0.75)",
+      "forca": 0.74,
+      "expected": "MEDIA"
+    },
+    {
+      "name": "media_threshold_exact_70",
+      "description": "Força exatamente 0.70 → MÉDIA (não adaptativo)",
+      "forca": 0.70,
+      "expected": "MEDIA"
+    },
+    {
+      "name": "media_threshold_exact",
+      "description": "Força exatamente 0.60 → MÉDIA (>= 0.60)",
+      "forca": 0.60,
+      "expected": "MEDIA"
+    },
+    {
+      "name": "media_threshold_65",
+      "description": "Força 0.65 → MÉDIA",
+      "forca": 0.65,
+      "expected": "MEDIA"
+    },
+    {
+      "name": "neutro_threshold_below_60",
+      "description": "Força 0.59 → NEUTRO (< 0.60)",
+      "forca": 0.59,
+      "expected": "NEUTRO"
+    },
+    {
+      "name": "neutro_threshold_low",
+      "description": "Força baixo → NEUTRO",
+      "forca": 0.50,
+      "expected": "NEUTRO"
+    },
+    {
+      "name": "neutro_threshold_zero",
+      "description": "Força zero → NEUTRO",
+      "forca": 0.0,
+      "expected": "NEUTRO"
+    },
+    {
+      "name": "neutro_threshold_floor",
+      "description": "Força no piso (após penalização) 0.18 → NEUTRO",
+      "forca": 0.18,
+      "expected": "NEUTRO"
+    }
+  ]
+}

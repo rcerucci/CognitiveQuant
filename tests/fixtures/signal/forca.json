@@ -1,0 +1,140 @@
+{
+  "test_cases": [
+    {
+      "name": "force_calculation_basic",
+      "description": "Cálculo básico de força",
+      "z_t": -1.5,
+      "percentil_z": 0.85,
+      "rho_1": 0.3,
+      "clv": 0.5,
+      "rb": 0.65,
+      "skewness": 0.5,
+      "cv_theta": 0.25,
+      "forca_penalty_cv": false,
+      "expected": {
+        "direction": "LONG",
+        "forca_bruta": 0.595,
+        "forca": 0.59,
+        "penalizacoes": []
+      }
+    },
+    {
+      "name": "force_with_cv_penalty",
+      "description": "Força com penalização CV",
+      "z_t": -1.0,
+      "percentil_z": 0.8,
+      "rho_1": 0.2,
+      "clv": 0.4,
+      "rb": 0.55,
+      "skewness": 1.5,
+      "cv_theta": 0.35,
+      "forca_penalty_cv": true,
+      "expected": {
+        "direction": "LONG",
+        "forca_bruta": 0.512,
+        "forca": 0.29,
+        "penalizacoes": ["cv_theta", "skewness"]
+      }
+    },
+    {
+      "name": "force_floor_018",
+      "description": "Força não cai abaixo do piso 0.18",
+      "z_t": 0.5,
+      "percentil_z": 0.4,
+      "rho_1": -0.5,
+      "clv": 0.1,
+      "rb": 0.1,
+      "skewness": 1.5,
+      "cv_theta": 0.35,
+      "forca_penalty_cv": true,
+      "expected": {
+        "direction": "SHORT",
+        "forca": 0.18
+      }
+    },
+    {
+      "name": "force_rounding",
+      "description": "Força arredondada para 2 casas decimais",
+      "z_t": -0.8,
+      "percentil_z": 0.7234,
+      "rho_1": 0.2567,
+      "clv": 0.4444,
+      "rb": 0.5555,
+      "skewness": null,
+      "cv_theta": null,
+      "forca_penalty_cv": false,
+      "expected": {
+        "direction": "LONG",
+        "forca_bruta": 0.512,
+        "forca": 0.51
+      }
+    },
+    {
+      "name": "force_none_values",
+      "description": "Cálculo de força com valores None",
+      "z_t": null,
+      "percentil_z": null,
+      "rho_1": null,
+      "clv": null,
+      "rb": null,
+      "skewness": null,
+      "cv_theta": null,
+      "forca_penalty_cv": false,
+      "expected": {
+        "direction": "NEUTRO",
+        "forca": 0.18,
+        "forca_bruta": 0.0
+      }
+    },
+    {
+      "name": "force_acf_negative_penalty",
+      "description": "ACF negativo aplica penalização ×0.70",
+      "z_t": -1.2,
+      "percentil_z": 0.9,
+      "rho_1": -0.4,
+      "clv": 0.6,
+      "rb": 0.7,
+      "skewness": 0.0,
+      "cv_theta": 0.2,
+      "forca_penalty_cv": false,
+      "expected": {
+        "direction": "LONG",
+        "forca_bruta": 0.57,
+        "forca": 0.4
+      }
+    },
+    {
+      "name": "force_direction_short",
+      "z_t": 1.8,
+      "percentil_z": 0.92,
+      "rho_1": 0.25,
+      "clv": 0.55,
+      "rb": 0.65,
+      "skewness": -0.5,
+      "cv_theta": null,
+      "forca_penalty_cv": false,
+      "expected": {
+        "direction": "SHORT",
+        "forca_bruta": 0.62,
+        "forca": 0.62
+      }
+    },
+    {
+      "name": "force_minimum_threshold",
+      "description": "Setwer threshold >=0.75 → ALTA",
+      "z_t": -2.5,
+      "percentil_z": 0.95,
+      "rho_1": 0.4,
+      "clv": 0.6,
+      "rb": 0.7,
+      "skewness": 0.0,
+      "cv_theta": 0.1,
+      "forca_penalty_cv": false,
+      "expected": {
+        "direction": "LONG",
+        "forca_bruta": 0.6875,
+        "forca": 0.69
+      }
+    }
+  ]
+}

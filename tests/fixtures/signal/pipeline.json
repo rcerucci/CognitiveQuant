@@ -1,0 +1,66 @@
+{
+  "test_cases": [
+    {
+      "name": "f4_neutro_no_promote",
+      "description": "F4 NEUTRO → pipeline F5 não promove LONG/SHORT",
+      "f4_status": "NEUTRO",
+      "f3_status": "PASS",
+      "bar": [1704067200000, 100.0, 102.0, 99.0, 101.0, 100.8, 101.2],
+      "expected": {
+        "status": "NEUTRO",
+        "reason_contains": "F4",
+        "payload_direcao": "NEUTRO"
+      }
+    },
+    {
+      "name": "full_pipeline_pass",
+      "description": "F4 PASS + confirmações OK → payload ALTA/MÉDIA",
+      "f4_status": "PASS",
+      "f3_status": "PASS",
+      "bar": [1704067200000, 100.0, 102.0, 99.0, 101.5, 101.2, 101.8],
+      "z_t": -1.8,
+      "percentil_z": 0.90,
+      "tau": 25.0,
+      "expected": {
+        "status": "PASS",
+        "payload_direcao": "LONG"
+      }
+    },
+    {
+      "name": "skewness_8_6_abort",
+      "description": "Skewness extrema → NEUTRO (short-circuit 8.6)",
+      "f4_status": "PASS",
+      "f3_status": "PASS",
+      "bar": [1704067200000, 100.0, 102.0, 99.0, 101.0, 100.8, 101.2],
+      "returns_skewed": true,
+      "expected": {
+        "status": "NEUTRO",
+        "payload_direcao": "NEUTRO"
+      }
+    },
+    {
+      "name": "f3_neutro_no_promote",
+      "description": "F3 NEUTRO → F5 NEUTRO",
+      "f4_status": "PASS",
+      "f3_status": "NEUTRO",
+      "bar": [1704067200000, 100.0, 102.0, 99.0, 101.0, 100.8, 101.2],
+      "expected": {
+        "status": "NEUTRO"
+      }
+    },
+    {
+      "name": "confirmacao_failure_neutro",
+      "description": "Falha de confirmação → NEUTRO",
+      "f4_status": "PASS",
+      "f3_status": "PASS",
+      "bar": [1704067200000, 100.0, 100.2, 99.8, 100.1, 100.0, 100.2],
+      "z_t": -1.0,
+      "percentil_z": 0.60,
+      "tau": 20.0,
+      "expected": {
+        "status": "NEUTRO",
+        "filters_count_at_least": 0
+      }
+    }
+  ]
+}
