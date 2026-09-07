@@ -137,3 +137,27 @@ Nenhum aberto — Marcos fechou LOCK 003b em 2026-09-06.
 
 Locks F1/F2 permanecem. Ordem: DFA (diagnóstico) → OU → gate τ/θ → bootstrap. CUSUM fora. Fixtures sintéticas bastam.
 Plan/Tasks **calados** até Marcos lockar K (e θ_min se ≠ θ>0).
+
+## Nota sobre S1 (hotfix 003b-s1-discreto)
+
+**S1 do aceite US2 NÃO é Euler.**
+
+O aceite original propunha a fórmula de Euler discreto:
+```
+X[t] += θ * (μ - X[t]) + σ * ε
+```
+
+**S1 é o OU discreto padrão** que `ou.py` estima:
+```
+X[t] = exp(-θ) * X[t-1] + σ * ε
+```
+
+### Diferença:
+- **Euler discreto**: φ = 1 - θ
+- **OU discreto correto**: φ = exp(-θ)
+
+Para θ = 0.50:
+- Euler: φ = 1 - 0.5 = 0.5
+- OU discreto: φ = exp(-0.5) ≈ 0.6065
+
+O OU discreto é a formulação correta para o processo OU em tempo discreto com passo dt=1.
