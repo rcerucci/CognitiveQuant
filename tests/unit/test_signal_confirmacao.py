@@ -269,20 +269,25 @@ class TestConfirmacaoIntegration:
             # Se skewness fora do intervalo, deve ser NEUTRO
             assert result.status == ConfirmacaoStatus.NEUTRO
     
-    def test_ljung_box_failure_returns_neutro(self):
-        """Given p-value >= 0.05, When confirmacao, Then NEUTRO."""
-        return_series = generate_white_noise_series(200, seed=42)
-        bar = [1704067200000, 100.0, 102.0, 98.5, 101.0, 100.8, 101.2]
-        
-        result = calculate_confirmacao(
-            returns=return_series,
-            bar=bar,
-            direction="LONG",
-            seed=42,
-        )
-        
-        if result.status == ConfirmacaoStatus.NEUTRO:
-            assert "Ljung-Box" in (result.reason or "")
+    def test_ljung_box_soft_gate(self):
+            """Given p-value >= 0.05, When confirmacao, Then PASS with lb_soft_gate=True (not NEUTRO)."""
+            return_series = generate_white_noise_series(200, seed=42)
+            bar = [1704067200000, 100.0, 102.0, 98.5, 101.0, 100.8, 101.2]
+
+            result = calculate_confirmacao(
+                returns=return_series,
+                bar=bar,
+                direction="LONG",
+                seed=42,
+            )
+
+            # Ljung-Box is now a soft gate - should NOT return NEUTRO for LB alone
+            # It should pass confirmacao with lb_soft_gate flag set
+            # (unless another hard gate fails)
+            assert result.metrics.lb_soft_gate == True, \
+                f"Ljung-Box soft gate flag should be True, got {result.metrics.lb_soft_gate}"
+            assert "8.2_lb" in result.filters_passed, \
+                "LB filter should be in filters_passed"
     
     def test_full_confirmation_pass(self):
         """Given série com confirmações OK, When confirmacao, Then PASS."""

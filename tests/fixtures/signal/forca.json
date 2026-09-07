@@ -135,6 +135,25 @@
         "forca_bruta": 0.6875,
         "forca": 0.69
       }
+    },
+    {
+      "name": "force_lb_soft_gate_penalty",
+      "description": "Ljung-Box p >= 0.05 aplica penalização ×0.70 (soft gate)",
+      "z_t": -1.0,
+      "percentil_z": 0.8,
+      "rho_1": 0.2,
+      "clv": 0.4,
+      "rb": 0.5,
+      "skewness": 0.0,
+      "cv_theta": 0.2,
+      "forca_penalty_cv": false,
+      "lb_soft_gate": true,
+      "expected": {
+        "direction": "LONG",
+        "forca_bruta": 0.505,
+        "forca": 0.35,
+        "penalizacoes": ["lb_soft"]
+      }
     }
   ]
 }

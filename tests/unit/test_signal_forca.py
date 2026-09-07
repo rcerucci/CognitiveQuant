@@ -128,7 +128,7 @@ class TestDirecao:
 
 class TestPenalizacoes:
     """Testes para penalizações."""
-    
+
     def test_penalizacao_skewness(self):
         """|S| in (1, 2) → ×0.70."""
         result = calcular_forca(
@@ -142,11 +142,32 @@ class TestPenalizacoes:
             forca_penalty_cv=False,
             seed=42,
         )
-        
+
         # Força bruta = 0.35*0.8 + 0.25*0.2 + 0.25*0.4 + 0.15*0.5 = 0.565
         # Com penalização skewness: 0.565 * 0.70 = 0.3955
         assert "skewness" in result.penalizacoes_aplicadas
-    
+
+    def test_penalizacao_lb_soft_gate(self):
+        """Ljung-Box p >= 0.05 → ×0.70 (soft gate 8.2)."""
+        result = calcular_forca(
+            z_t=-1.0,
+            percentil_z=0.80,
+            rho_1=0.2,
+            clv=0.4,
+            rb=0.5,
+            skewness=0.0,
+            cv_theta=None,
+            forca_penalty_cv=False,
+            lb_soft_gate=True,
+            seed=42,
+        )
+
+        # Força bruta = 0.35*0.8 + 0.25*0.2 + 0.25*0.4 + 0.15*0.5 = 0.505
+        # Com penalização lb_soft: 0.505 * 0.70 = 0.3535
+        # Rounded: 0.35
+        assert "lb_soft" in result.penalizacoes_aplicadas
+        assert abs(result.forca - 0.35) < 0.01
+
     def test_penalizacao_cv_theta(self):
         """CV_θ > 0.30 → ×0.80."""
         result = calcular_forca(
@@ -359,28 +380,33 @@ class TestForcaFixtures:
                 f"TestCase {case['name']}: direção {result.direction.value} != {expected['direction']}"
     
     def test_fixture_penalizacoes_validation(self):
-        """Valida penalizações nos fixtures."""
-        fixture_cases = load_forca_fixtures()
-        
-        for case in fixture_cases["test_cases"]:
-            result = calcular_forca(
-                z_t=case["z_t"],
-                percentil_z=case["percentil_z"],
-                rho_1=case["rho_1"],
-                clv=case["clv"],
-                rb=case["rb"],
-                skewness=case["skewness"],
-                cv_theta=case["cv_theta"],
-                forca_penalty_cv=case["forca_penalty_cv"],
-                seed=42,
-            )
-            
-            expected = case["expected"]
-            
-            if "penalizacoes" in expected:
-                for penal in expected["penalizacoes"]:
-                    assert penal in result.penalizacoes_aplicadas, \
-                        f"TestCase {case['name']}: penalização {penal} não aplicada"
+            """Valida penalizações nos fixtures."""
+            fixture_cases = load_forca_fixtures()
+
+            for case in fixture_cases["test_cases"]:
+                # Build kwargs dynamically - lb_soft_gate is optional
+                kwargs = {
+                    "z_t": case["z_t"],
+                    "percentil_z": case["percentil_z"],
+                    "rho_1": case["rho_1"],
+                    "clv": case["clv"],
+                    "rb": case["rb"],
+                    "skewness": case["skewness"],
+                    "cv_theta": case["cv_theta"],
+                    "forca_penalty_cv": case["forca_penalty_cv"],
+                    "seed": 42,
+                }
+                if "lb_soft_gate" in case:
+                    kwargs["lb_soft_gate"] = case["lb_soft_gate"]
+
+                result = calcular_forca(**kwargs)
+
+                expected = case["expected"]
+
+                if "penalizacoes" in expected:
+                    for penal in expected["penalizacoes"]:
+                        assert penal in result.penalizacoes_aplicadas, \
+                            f"TestCase {case['name']}: penalização {penal} não aplicada"
 
 
 class TestForcaResultSchema:
