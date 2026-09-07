@@ -2,42 +2,48 @@
   "test_cases": [
     {
       "name": "zscore_basic_calculation",
-      "description": "Cálculo básico Z = (X - μ) / σ",
-      "X_t": 0.005,
-      "mu_t": 0.001,
-      "sigma_t": 0.02,
+      "description": "Cálculo básico Z = r_t / σ",
+      "r_t": 0.001,
+      "sigma_t": 0.001,
       "expected": {
         "status": "PASS",
-        "z_t": 0.2
+        "z_t": 1.0
       }
     },
     {
-      "name": "zscore_positive_X",
-      "description": "X > μ resulta em Z positivo",
-      "X_t": 0.01,
-      "mu_t": 0.002,
+      "name": "zscore_positive_return",
+      "description": "r > 0 resulta em Z positivo",
+      "r_t": 0.01,
       "sigma_t": 0.02,
       "expected": {
         "status": "PASS",
-        "z_t": 0.4
+        "z_t": 0.5
       }
     },
     {
-      "name": "zscore_negative_X",
-      "description": "X < μ resulta em Z negativo",
-      "X_t": -0.005,
-      "mu_t": 0.001,
+      "name": "zscore_negative_return",
+      "description": "r < 0 resulta em Z negativo",
+      "r_t": -0.005,
       "sigma_t": 0.02,
       "expected": {
         "status": "PASS",
-        "z_t": -0.3
+        "z_t": -0.25
+      }
+    },
+    {
+      "name": "zscore_zero_return",
+      "description": "r = 0 resulta em Z = 0",
+      "r_t": 0.0,
+      "sigma_t": 0.02,
+      "expected": {
+        "status": "PASS",
+        "z_t": 0.0
       }
     },
     {
       "name": "zscore_sigma_zero",
       "description": "σ = 0 resulta em NEUTRO",
-      "X_t": 0.001,
-      "mu_t": 0.001,
+      "r_t": 0.001,
       "sigma_t": 0.0,
       "expected": {
         "status": "NEUTRO",
@@ -47,8 +53,7 @@
     {
       "name": "zscore_sigma_negative",
       "description": "σ < 0 resulta em NEUTRO",
-      "X_t": 0.001,
-      "mu_t": 0.001,
+      "r_t": 0.001,
       "sigma_t": -0.01,
       "expected": {
         "status": "NEUTRO",
@@ -56,36 +61,23 @@
       }
     },
     {
-      "name": "zscore_sigma_infinity",
-      "description": "σ = inf resulta em NEUTRO",
-      "X_t": 0.001,
-      "mu_t": 0.001,
-      "sigma_t": 1e308,
+      "name": "zscore_sigma_nan",
+      "description": "σ = NaN resulta em NEUTRO",
+      "r_t": 0.001,
+      "sigma_t": null,
       "expected": {
         "status": "NEUTRO",
         "reason": "invalid_sigma_not_finite"
       }
     },
     {
-      "name": "zscore_mu_nan",
-      "description": "μ = NaN resulta em NEUTRO",
-      "X_t": 0.001,
-      "mu_t": null,
+      "name": "zscore_r_t_nan",
+      "description": "r_t = NaN resulta em NEUTRO",
+      "r_t": null,
       "sigma_t": 0.01,
       "expected": {
         "status": "NEUTRO",
-        "reason": "invalid_mu_not_finite"
-      }
-    },
-    {
-      "name": "zscore_X_nan",
-      "description": "X_t = NaN resulta em NEUTRO",
-      "X_t": null,
-      "mu_t": 0.001,
-      "sigma_t": 0.01,
-      "expected": {
-        "status": "NEUTRO",
-        "reason": "invalid_X_t_not_finite"
+        "reason": "invalid_r_t_not_finite"
       }
     }
   ]

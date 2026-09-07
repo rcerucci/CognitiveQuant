@@ -46,11 +46,11 @@ class F4PipelineResult:
 
 class F4Pipeline:
     """Pipeline F4 para GARCH + Z + percentil."""
-    
+
     GARCH_WINDOW = 200  # r_{t-199:t}
     FALLBACK_N = 20     # √(∑ r² / 20)
     PERCENTIL_WINDOW = 200
-    
+
     def __init__(
         self,
         f3_result: F3PipelineResult,
@@ -61,7 +61,7 @@ class F4Pipeline:
         seed: int = 42,
     ):
         """Inicializa o pipeline F4.
-        
+
         Args:
             f3_result: Resultado do pipeline F3 (deve ter status PASS)
             X_t: Preço/log-preço atual
@@ -76,20 +76,20 @@ class F4Pipeline:
         self.returns_history = returns_history
         self.z_history = z_history
         self.seed = seed
-    
+
     def _check_f3_pass(self) -> bool:
         """Verifica se F3 resultou em PASS."""
         return self.f3_result.status == F3Status.PASS
-    
+
     def run(self) -> F4PipelineResult:
         """Executa o pipeline F4.
-        
+
         Ordem:
         1. Verificar F3 PASS
         2. Estimar GARCH → σ_t (ou fallback)
         3. Calcular Z_t
         4. Calcular percentil_z
-        
+
         Returns:
             F4PipelineResult com garch_sigma, Z_t, percentil_z, fonte
         """
@@ -100,15 +100,15 @@ class F4Pipeline:
                 reason="F3 did not pass",
                 metrics={"f3_status": str(self.f3_result.status)}
             )
-        
+
         # Import components (lazy import to avoid circular)
         from motor.vol.garch import estimate_garch_with_fallback, GARCHStatus
         from motor.vol.zscore import calculate_zscore, ZScoreStatus
         from motor.vol.percentil import calculate_percentil_z, PercentilStatus
-        
+
         # Step 2: Estimar GARCH com fallback
         garch_result = estimate_garch_with_fallback(self.returns_history, seed=self.seed)
-        
+
         if garch_result.status == GARCHStatus.NEUTRO:
             # GARCH failed and fallback also failed
             return F4PipelineResult(
@@ -116,22 +116,21 @@ class F4Pipeline:
                 reason=garch_result.reason or "garch_fallback_failed",
                 metrics={"garch_status": str(garch_result.status)}
             )
-        
+
         # Step 3: Calcular Z-score
-        mu_t = self.f3_result.mu
-        if mu_t is None:
+        garch_sigma = garch_result.garch_sigma
+        if garch_sigma is None:
             return F4PipelineResult(
                 status=F4Status.NEUTRO,
-                reason="mu_not_available",
+                reason="garch_sigma_none",
                 metrics={"garch_source": garch_result.source}
             )
-        
+
         zscore_result = calculate_zscore(
-            self.X_t,
-            mu_t,
-            garch_result.garch_sigma
+            self.r_t,
+            garch_sigma
         )
-        
+
         if zscore_result.status == ZScoreStatus.NEUTRO:
             return F4PipelineResult(
                 status=F4Status.NEUTRO,
@@ -141,17 +140,17 @@ class F4Pipeline:
                     "garch_sigma": garch_result.garch_sigma
                 }
             )
-        
+
         # Step 4: Calcular percentil de |Z|
         # Need to build |Z| history including current Z
         z_history_extended = list(self.z_history) + [abs(zscore_result.z_t)]
-        
+
         percentil_result = calculate_percentil_z(
             zscore_result.z_t,
             z_history_extended,
             window_size=self.PERCENTIL_WINDOW
         )
-        
+
         if percentil_result.status == PercentilStatus.NEUTRO:
             return F4PipelineResult(
                 status=F4Status.NEUTRO,
@@ -161,7 +160,7 @@ class F4Pipeline:
                     "z_t": zscore_result.z_t
                 }
             )
-        
+
         # Build final result
         return F4PipelineResult(
             status=F4Status.PASS,
@@ -190,7 +189,7 @@ def run_f4_pipeline(
     seed: int = 42,
 ) -> F4PipelineResult:
     """Executa o pipeline F4.
-    
+
     Args:
         f3_result: Resultado do pipeline F3
         X_t: Preço/log-preço atual
@@ -198,7 +197,7 @@ def run_f4_pipeline(
         returns_history: Série histórica de retornos
         z_history: Histórico de |Z| para percentil
         seed: Seed para reprodutibilidade
-        
+
     Returns:
         F4PipelineResult in-memory com garch_sigma, Z_t, percentil_z, fonte
     """
