@@ -5,7 +5,6 @@ Consumes F1→F5 APIs in-memory.
 
 Spec F6 §10.1 - US1, T013
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -223,30 +222,33 @@ class BarRunner:
             )
         
         # F4: Pipeline volatilidade
-        # Calculate returns for GARCH
-        # Pass the Z history window (last 199 values) to F4, not tau
+        # 201 precos -> 200 retornos (GARCH)
+        returns_start = max(0, bar_index - 200)
+        returns_bars = self.validated_bars[returns_start:bar_index + 1]
+
         z_history_for_f4 = self.z_history[-199:] if len(self.z_history) > 199 else self.z_history
-        
+
         try:
             returns = []
-            for i in range(1, len(filter_bars)):
-                b1 = filter_bars[i-1]
-                b2 = filter_bars[i]
+            for i in range(1, len(returns_bars)):
+                b1 = returns_bars[i-1]
+                b2 = returns_bars[i]
                 mid1 = b1.P_t
                 mid2 = b2.P_t
                 if mid1 > 0:
                     returns.append(np.log(mid2 / mid1))
                 else:
                     returns.append(0.0)
-            
-            X_t = bar.P_t  # Current mid price
+
+            X_t = bar.P_t
             r_t = returns[-1] if returns else 0.0
-            
+            returns_for_garch = returns[-200:] if len(returns) >= 200 else []
+
             f4_pipeline = F4Pipeline(
                 f3_result=f3_result,
                 X_t=X_t,
                 r_t=r_t,
-                returns_history=returns[-200:] if len(returns) > 200 else returns,
+                returns_history=returns_for_garch,
                 z_history=z_history_for_f4,
                 seed=self.seed,
             )
