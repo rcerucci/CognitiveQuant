@@ -61,11 +61,16 @@ class Pipeline:
         self.index = index
     
     def _check_gap_dados(self) -> bool:
-        """Verifica se alguma barra tem gap_dados."""
+        """Verifica se alguma barra tem gap_dados (buraco real).
+
+        weekend_fill sozinho NÃO conta como gap_dados (Addendum F1).
+        Se a barra tem 'gap_dados' em flags, é um buraco real independente
+        de ter também 'weekend_fill'.
+        """
         for bar in self.bars:
-            if not bar.flags and bar.status is None:
+            if not bar.flags:
                 continue
-            if bar.flags and "gap_dados" in bar.flags:
+            if "gap_dados" in bar.flags:
                 return True
         return False
     
