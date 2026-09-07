@@ -217,6 +217,43 @@ def is_weekend_gap(bars: list[list], index: int, m30_interval_ms: int = 1800000)
     return False
 
 
+def is_weekend_session_hole(
+    prev_ts: int, curr_ts: int, m30_interval_ms: int = 1800000
+) -> bool:
+    """Verifica se um gap atravessa fim de semana UTC dentro da janela [36h, 72h].
+
+    Addendum F1 — gap de sessão ≠ buraco de dados:
+    Em FX 24×5 (e ouro), se o intervalo entre duas barras consecutivas:
+      - 36h <= Δt <= 72h  E
+      - atravessa sábado e/ou domingo UTC
+    então NÃO é gap_dados / series_has_gaps.
+
+    Returns:
+        True se o gap for um "weekend session hole" (não marcar gap_dados).
+    """
+    delta_ms = curr_ts - prev_ts
+    delta_hours = delta_ms / (3600 * 1000.0)
+
+    if delta_hours < 36 or delta_hours > 72:
+        return False
+
+    prev_dt = datetime.fromtimestamp(prev_ts / 1000.0, tz=timezone.utc)
+    curr_dt = datetime.fromtimestamp(curr_ts / 1000.0, tz=timezone.utc)
+
+    # Itera dia-a-dia entre prev_dt e curr_dt, verificando se algum dia
+    # na sequência é sábado (5) ou domingo (6) UTC.
+    from datetime import timedelta
+
+    current = prev_dt
+    end_exclusive = curr_dt
+    while current < end_exclusive:
+        if current.weekday() in (5, 6):  # Saturday or Sunday
+            return True
+        current += timedelta(days=1)
+
+    return False
+
+
 def interpolate_value(prev_val: float, next_val: float, ratio: float) -> float:
     """Interpolação linear entre dois valores."""
     return prev_val + (next_val - prev_val) * ratio
@@ -281,21 +318,34 @@ def handle_gaps(bars: list[list], m30_interval_ms: int = 1800000) -> dict:
                 "flags": flags
             })
         else:
-            gap_intervals.append({
-                "index": i,
-                "gap_size": gap_size,
-                "type": "gap_dados"
-            })
-            
-            flags = ["gap_dados"]
-            if is_weekend_gap(bars, i, m30_interval_ms):
-                flags.append("weekend_fill")
-            
-            result_bars.append({
-                "data": bar,
-                "status": BarStatus.NEUTRO,
-                "flags": flags
-            })
+            # gap > 4 — check if it's a weekend session hole (Addendum F1)
+            prev_ts = bars[i - 1][0]
+            curr_ts = bar[0]
+
+            if is_weekend_session_hole(prev_ts, curr_ts, m30_interval_ms):
+                # Weekend session hole: NOT gap_dados
+                # Do not mark gap_dados; mark as weekend_fill
+                result_bars.append({
+                    "data": bar,
+                    "status": BarStatus.VALID,
+                    "flags": ["weekend_fill"]
+                })
+            else:
+                gap_intervals.append({
+                    "index": i,
+                    "gap_size": gap_size,
+                    "type": "gap_dados"
+                })
+
+                flags = ["gap_dados"]
+                if is_weekend_gap(bars, i, m30_interval_ms):
+                    flags.append("weekend_fill")
+
+                result_bars.append({
+                    "data": bar,
+                    "status": BarStatus.NEUTRO,
+                    "flags": flags
+                })
     
     return {
         "bars": result_bars,
