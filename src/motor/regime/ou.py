@@ -6,6 +6,13 @@ para θ ≤ 0 ou não-finito, conforme spec §3.5.
 Fórmulas:
 - OU: dX_t = -θ * X_t * dt + μ * dt + σ * dW_t
 - τ = ln(2) / θ  (tempo de meia-vida)
+- OU discreto: X[t] = exp(-θ) * X[t-1] + σ * ε (ou mu + exp(-theta)*(X_{t-1} - mu) + noise)
+
+NOTA IMPORTANTE (hotfix 003b):
+- S1 do aceite US2 NÃO é Euler: X[t] += θ * (μ - X[t]) + σ * ε
+- S1 é o OU discreto padrão: X[t] = exp(-θ) * X[t-1] + σ * ε
+- Euler dá φ = 1 - θ (INCORRETO para θ > 0)
+- OU discreto correto: φ = exp(-θ)
 """
 
 from __future__ import annotations
