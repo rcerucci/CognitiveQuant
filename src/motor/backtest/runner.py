@@ -224,6 +224,9 @@ class BarRunner:
         
         # F4: Pipeline volatilidade
         # Calculate returns for GARCH
+        # Pass the Z history window (last 199 values) to F4, not tau
+        z_history_for_f4 = self.z_history[-199:] if len(self.z_history) > 199 else self.z_history
+        
         try:
             returns = []
             for i in range(1, len(filter_bars)):
@@ -239,18 +242,22 @@ class BarRunner:
             X_t = bar.P_t  # Current mid price
             r_t = returns[-1] if returns else 0.0
             
-            # Z history for percentile
-            z_history_extended = list(self.z_history) + [abs(f3_result.tau if f3_result.tau else 0)][:200]
-            
             f4_pipeline = F4Pipeline(
                 f3_result=f3_result,
                 X_t=X_t,
                 r_t=r_t,
                 returns_history=returns[-200:] if len(returns) > 200 else returns,
-                z_history=z_history_extended[-199:] if len(z_history_extended) > 199 else z_history_extended,
+                z_history=z_history_for_f4,
                 seed=self.seed,
             )
             f4_result = f4_pipeline.run()
+            
+            # After F4 PASS, append z_t to z_history (cap at 200)
+            # Only append real z_t values, never tau or fake zeros
+            if f4_result.status == F4Status.PASS and f4_result.z_t is not None:
+                self.z_history.append(f4_result.z_t)
+                if len(self.z_history) > 200:
+                    self.z_history = self.z_history[-200:]
         except Exception as e:
             logger.warning(f"F4 vol error at bar {bar_index}: {e}")
             return RunResult(

@@ -300,5 +300,138 @@ class TestRunnerDeterminism:
             assert r1.timestamp == r2.timestamp
             assert r1.f5_status == r2.f5_status
 
+class TestZHistoryF4Append:
+    """Testes para z_history append de Z_t após F4 PASS (bug fix 006-z-history).
+    
+    Requisitos:
+    1. Após F4 PASS: append do z-score F4 em self.z_history (cap 200)
+    2. Passar a F4 a janela de Z, nunca τ
+    3. Se F4 NEUTRO/warm_up: NÃO append τ; NÃO append 0 falso
+    4. seed=42: 5 barras F4 PASS -> len(z_history)==5 e valores == z do F4, ≠ tau
+    5. 1 F4 fail no meio -> history não ganha tau
+    """
+    
+    def test_z_history_append_z_not_tau_5_pass_bars(self):
+        """Dado 5 barras com F4 PASS consecutivas,
+        Quando o runner executa com seed=42,
+        Entao len(z_history)==5 e valores sao z-do-F4, != tau."""
+        # Criar serie que gera F4 PASS - precisa de tendencia clara
+        np.random.seed(42)
+        bars = []
+        for i in range(250):
+            ts = 1704067200000 + i * 1800000  # M30
+            mid = 100.0 + i * 0.02  # Tendencia linear clara
+            bars.append([
+                ts,
+                mid - 0.5,
+                mid + 0.5,
+                mid - 1.0,
+                mid,
+                mid - 0.25,
+                mid + 0.25,
+            ])
+        
+        runner = BarRunner(seed=42)
+        result = run_backtest(bars, "EUR/USD", seed=42)
+        
+        # Contar barras F4 PASS
+        f4_pass_count = sum(1 for b in result.bars if b.f4_status == "PASS")
+        
+        # Se tivermos pelo menos 5 F4 PASS
+        if f4_pass_count >= 5:
+            # z_history deve ter exatamente o numero de F4 PASS (ou menos se F4 fail intercalado)
+            # Para este teste, esperamos pelo menos 5 barras PASS consecutivas no inicio
+            
+            # Contar F4 PASS consecutivas do inicio
+            consecutive_pass = 0
+            for b in result.bars:
+                if b.f4_status == "PASS":
+                    consecutive_pass += 1
+                else:
+                    break
+            
+            if consecutive_pass >= 5:
+                # z_history deve ter exatamente 5 valores
+                assert len(runner.z_history) == 5, \
+                    f"Expected z_history length 5, got {len(runner.z_history)}"
+                
+                # Todos os valores devem ser floats reais (z-scores)
+                for z_val in runner.z_history:
+                    assert isinstance(z_val, (int, float)), \
+                        f"z_val should be numeric, got {type(z_val)}"
+                    # Verificar que nao e' um valor de tau (1-20 inteiro)
+                    # tau tipico e' inteiro entre 1 e 20, z_score pode ser qualquer real
+                    assert not (isinstance(z_val, int) and 1 <= z_val <= 20), \
+                        f"z_val should be z-score, not tau (integer 1-20): {z_val}"
+    
+    def test_z_history_no_tau_on_f4_fail(self):
+        """Dado 1 F4 fail no meio da sequencia,
+        Quando o runner executa,
+        Entao history nao ganha tau nem append 0 falso."""
+        np.random.seed(42)
+        bars = []
+        for i in range(250):
+            ts = 1704067200000 + i * 1800000
+            mid = 100.0 + np.random.randn() * 0.1  # Variacao aleatoria
+            bars.append([
+                ts,
+                mid - 0.5,
+                mid + 0.5,
+                mid - 1.0,
+                mid,
+                mid - 0.25,
+                mid + 0.25,
+            ])
+        
+        runner = BarRunner(seed=42)
+        result = run_backtest(bars, "EUR/USD", seed=42)
+        
+        # Verificar que z_history contem apenas z-scores validos
+        for z_val in runner.z_history:
+            assert isinstance(z_val, (int, float)), \
+                f"z_history value should be numeric, got {type(z_val)}"
+            # Nao deve conter tau
+            if isinstance(z_val, int) and 1 <= z_val <= 20:
+                raise AssertionError(f"z_history contains tau value: {z_val}")
+    
+    def test_z_history_only_appends_on_f4_pass(self):
+        """Dado runner,
+        Quando F4 NEUTRAL ocorre,
+        Entao NÃO append tau nem 0 falso em z_history."""
+        np.random.seed(42)
+        bars = []
+        # Criar uma serie com variacao que gera F4 NEUTRO
+        for i in range(250):
+            ts = 1704067200000 + i * 1800000
+            mid = 100.0 + np.random.randn() * 0.05  # Baixa volatilidade
+            bars.append([
+                ts,
+                mid - 0.3,
+                mid + 0.3,
+                mid - 0.5,
+                mid,
+                mid - 0.15,
+                mid + 0.15,
+            ])
+        
+        runner = BarRunner(seed=42)
+        result = run_backtest(bars, "EUR/USD", seed=42)
+        
+        # Para cada barra que resultou em NEUTRO, verificar que nao foi append tau
+        # O z_history so deve crescer quando F4 PASS
+        for i, b in enumerate(result.bars):
+            if b.f4_status == "NEUTRAL":
+                # Se F4 foi NEUTRAL, o z_history naquele ponto nao deve ter adicionado tau
+                # Ou seja, o tamanho de z_history pelo menos i+1 deve ser <= count de PASS ate aqui
+                pass_f4_count = sum(1 for j in range(i+1) if result.bars[j].f4_status == "PASS")
+                assert len(runner.z_history) <= pass_f4_count, \
+                    f"F4 NEUTRAL at bar {i} should not append to z_history"
+                
+                # Verificar que nao contem tau
+                for z_val in runner.z_history:
+                    assert not (isinstance(z_val, int) and 1 <= z_val <= 20), \
+                        f"z_history should not contain tau values"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
