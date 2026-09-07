@@ -3,7 +3,7 @@
 Implementa:
 - Direção: LONG (Z_t < 0) / SHORT (Z_t > 0) / NEUTRO
 - Força bruta: 0.35×P_t + 0.25×max(ρ₁,0) + 0.25×|CLV| + 0.15×RB
-- Penalizações: skew → CV_θ → ACF (ρ₁ < 0)
+- Penalizações: skew → CV_θ → ACF (ρ₁ < 0) → Ljung-Box (p >= 0.05)
 - Piso: 0.18
 - Round: 2 casas decimais
 
@@ -60,18 +60,20 @@ def calcular_forca(
     skewness: Optional[float],
     cv_theta: Optional[float],
     forca_penalty_cv: bool = False,
+    lb_soft_gate: bool = False,  # 8.2 Ljung-Box p >= 0.05
     seed: int = 42,
 ) -> ForcaResult:
     """Calcula força e direção do sinal.
-    
+
     Fórmula da força bruta:
         Força = 0.35×P_t + 0.25×max(ρ₁,0) + 0.25×|CLV| + 0.15×RB
-    
+
     Penalizações (ordem):
         1. |Skewness| suave (1 < |S| < 2): ×0.70
         2. CV_θ > 0.30: ×0.80
         3. ρ₁ < 0 (reversão): ×0.70
-    
+        4. Ljung-Box p >= 0.05: ×0.70 (soft gate tipo ACF)
+
     Args:
         z_t: Z-score condicional
         percentil_z: Percentil de Z (|Z|)
@@ -81,14 +83,15 @@ def calcular_forca(
         skewness: Skewness da distribuição
         cv_theta: Coefficient of variation de θ
         forca_penalty_cv: Flag de penalização CV do F3
+        lb_soft_gate: Flag de penalização Ljung-Box (8.2)
         seed: Seed para reprodutibilidade
-        
+
     Returns:
         ForcaResult com direção, força e penalizações
     """
     import numpy as np
     np.random.seed(seed)
-    
+
     # Determinar direção
     if z_t is not None:
         if z_t < 0:
@@ -99,7 +102,7 @@ def calcular_forca(
             direction = Direction.NEUTRO
     else:
         direction = Direction.NEUTRO
-    
+
     # Calcular força bruta
     # max(ρ₁, 0) - ACF negativo não conta no termo positivo (penaliza depois)
     if clv is None:
@@ -108,26 +111,26 @@ def calcular_forca(
         rb = 0.0
     if percentil_z is None:
         percentil_z = 0.0
-    
+
     rho_1_positive = max(rho_1, 0) if rho_1 is not None else 0.0
-    
+
     forca_bruta = (
         0.35 * percentil_z +
         0.25 * rho_1_positive +
         0.25 * abs(clv) +
         0.15 * rb
     )
-    
+
     # Aplicar penalizações
     penalizacoes = []
     forca = forca_bruta
-    
+
     # 1. Penalização de skewness (1 < |S| < 2) → ×0.70
     if skewness is not None:
         if 1.0 < abs(skewness) < 2.0:
             forca *= 0.70
             penalizacoes.append("skewness")
-    
+
     # 2. Penalização CV_θ > 0.30 → ×0.80
     # Nota: forca_penalty_cv é SINÓNIMO de cv_theta > 0.30 (FR-007 F3)
     # Apenas uma penalização ×0.80, não duas
@@ -141,18 +144,23 @@ def calcular_forca(
         # Ainda assim aplicar penalização
         forca *= 0.80
         penalizacoes.append("cv_theta")
-    
-    # 4. Penalização ACF negativo (reversão) → ×0.70
+
+    # 3. Penalização ACF negativo (reversão) → ×0.70
     if rho_1 is not None and rho_1 < 0:
         forca *= 0.70
         penalizacoes.append("acf_neg")
-    
+
+    # 4. Penalização Ljung-Box p >= 0.05 (soft gate tipo ACF) → ×0.70
+    if lb_soft_gate:
+        forca *= 0.70
+        penalizacoes.append("lb_soft")
+
     # Aplicar piso 0.18
     forca = max(forca, 0.18)
-    
+
     # Arredondar para 2 casas decimais
     forca = round(forca, 2)
-    
+
     return ForcaResult(
         status=ForcaStatus.CALCULADA,
         direction=direction,

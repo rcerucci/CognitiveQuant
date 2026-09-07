@@ -30,6 +30,7 @@ from motor.signal.forca import (
     Direction,
     Confidence,
     calcular_forca,
+    ForcaStatus,
 )
 from motor.signal.thresholds import (
     ConfidenceLevel,
@@ -189,6 +190,7 @@ class F5Pipeline:
             skewness=confirmacao.metrics.skewness if confirmacao.metrics else None,
             cv_theta=cv_theta,
             forca_penalty_cv=forca_penalty_cv,
+            lb_soft_gate=confirmacao.metrics.lb_soft_gate if confirmacao.metrics else False,
             seed=self.seed,
         )
         
